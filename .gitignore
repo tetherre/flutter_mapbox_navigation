@@ -10,3 +10,4 @@
 /example/android/gradle.properties
 
 build/
+android/gradle.properties
