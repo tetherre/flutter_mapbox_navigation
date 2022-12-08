@@ -268,7 +268,7 @@ class NavigationActivity : AppCompatActivity() {
         // start the trip session to being receiving location updates in free drive
         // and later when a route is set also receiving route progress updates
         mapboxNavigation.startTripSession()
-
+        findFirstRoute(points[0], points[1]);
     }
 
     override fun onStart() {
@@ -331,7 +331,7 @@ class NavigationActivity : AppCompatActivity() {
         // that make sure the route request is optimized
         // to allow for support of all of the Navigation SDK features
         val routeOptions = RouteOptions.builder()
-            .applyDefaultNavigationOptions()
+            .applyDefaultNavigationOptions(FlutterMapboxNavigationPlugin.navigationMode)
             .applyLanguageAndVoiceUnitOptions(this)
             .coordinatesList(listOf(originPoint, destination))
             // provide the bearing for the origin of the request to ensure
@@ -370,6 +370,54 @@ class NavigationActivity : AppCompatActivity() {
             }
         )
     }
+
+    private fun findFirstRoute(originPoint: Point, destination: Point) {
+        // execute a route request
+        // it's recommended to use the
+        // applyDefaultNavigationOptions and applyLanguageAndVoiceUnitOptions
+        // that make sure the route request is optimized
+        // to allow for support of all of the Navigation SDK features
+        mapboxNavigation.requestRoutes(
+            RouteOptions.builder()
+                .applyDefaultNavigationOptions()
+                .profile(FlutterMapboxNavigationPlugin.navigationMode)
+                .applyLanguageAndVoiceUnitOptions(this)
+                .coordinatesList(listOf(originPoint, destination))
+                // provide the bearing for the origin of the request to ensure
+                // that the returned route faces in the direction of the current user movement
+                .bearingsList(
+                    listOf(
+                        Bearing.builder()
+                            .angle(45.0)
+                            .degrees(45.0)
+                            .build(),
+                        null
+                    )
+                )
+                .layersList(listOf(mapboxNavigation.getZLevel(), null))
+                .build(),
+            object : RouterCallback {
+                override fun onRoutesReady(
+                    routes: List<DirectionsRoute>,
+                    routerOrigin: RouterOrigin
+                ) {
+                    setRouteAndStartNavigation(routes)
+                }
+
+                override fun onFailure(
+                    reasons: List<RouterFailure>,
+                    routeOptions: RouteOptions
+                ) {
+                    // no impl
+                }
+
+                override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
+                    
+                }
+            }
+        )
+    }
+
 
     //MultiWaypoint Navigation
     private fun addWaypoint(destination: Point, name: String?) {
@@ -457,7 +505,7 @@ class NavigationActivity : AppCompatActivity() {
         binding.tripProgressCard.visibility = View.VISIBLE
 
         // move the camera to overview when new route is available
-        navigationCamera.requestNavigationCameraToOverview()
+        navigationCamera.requestNavigationCameraToFollowing()
     }
 
     private fun clearRouteAndStopNavigation() {
@@ -472,6 +520,8 @@ class NavigationActivity : AppCompatActivity() {
         binding.maneuverView.visibility = View.INVISIBLE
         binding.routeOverview.visibility = View.INVISIBLE
         binding.tripProgressCard.visibility = View.INVISIBLE
+        
+        finish();
     }
 
     private fun startSimulation(route: DirectionsRoute) {

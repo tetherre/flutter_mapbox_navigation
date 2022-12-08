@@ -58,7 +58,7 @@ public class FlutterMapboxNavigationPlugin: FlutterPlugin, MethodCallHandler, Ev
     val wayPoints: MutableList<Point> = mutableListOf()
 
     var showAlternateRoutes: Boolean = true
-    val allowsClickToSetDestination: Boolean = false
+    val allowsClickToSetDestination: Boolean = true
     var allowsUTurnsAtWayPoints: Boolean = false
     var navigationMode =  DirectionsCriteria.PROFILE_DRIVING_TRAFFIC
     var simulateRoute = false
