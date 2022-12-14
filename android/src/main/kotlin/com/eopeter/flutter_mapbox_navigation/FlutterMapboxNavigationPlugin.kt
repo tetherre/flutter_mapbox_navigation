@@ -24,6 +24,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.platform.PlatformViewRegistry
 import java.util.*
+import android.util.Log
 
 /** FlutterMapboxNavigationPlugin */
 public class FlutterMapboxNavigationPlugin: FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler, ActivityAware {
@@ -111,6 +112,8 @@ public class FlutterMapboxNavigationPlugin: FlutterPlugin, MethodCallHandler, Ev
     val arguments = call.arguments as? Map<String, Any>
 
     val navMode = arguments?.get("mode") as? String
+
+    Log.d("Plugin", "navMode: " + navMode)
     if(navMode != null)
     {
       if(navMode == "walking")
@@ -119,8 +122,11 @@ public class FlutterMapboxNavigationPlugin: FlutterPlugin, MethodCallHandler, Ev
         navigationMode = DirectionsCriteria.PROFILE_CYCLING;
       else if(navMode == "driving")
         navigationMode = DirectionsCriteria.PROFILE_DRIVING;
+      else if(navMode == "drivingWithTraffic")
+        navigationMode = DirectionsCriteria.PROFILE_DRIVING_TRAFFIC;
     }
 
+    Log.d("Plugin", "navigationMode: " + navigationMode)
     val alternateRoutes = arguments?.get("alternatives") as? Boolean
     if(alternateRoutes != null){
       showAlternateRoutes = alternateRoutes

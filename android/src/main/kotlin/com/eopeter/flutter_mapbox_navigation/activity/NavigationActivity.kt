@@ -82,6 +82,7 @@ import com.mapbox.navigation.ui.voice.model.SpeechVolume
 import eopeter.flutter_mapbox_navigation.R
 import eopeter.flutter_mapbox_navigation.databinding.NavigationActivityBinding
 import java.util.Locale
+import android.util.Log
 
 class NavigationActivity : AppCompatActivity() {
 
@@ -377,10 +378,10 @@ class NavigationActivity : AppCompatActivity() {
         // applyDefaultNavigationOptions and applyLanguageAndVoiceUnitOptions
         // that make sure the route request is optimized
         // to allow for support of all of the Navigation SDK features
+        Log.d("findFirstRoute", "navigationMode: " + FlutterMapboxNavigationPlugin.navigationMode);
         mapboxNavigation.requestRoutes(
             RouteOptions.builder()
-                .applyDefaultNavigationOptions()
-                .profile(FlutterMapboxNavigationPlugin.navigationMode)
+                .applyDefaultNavigationOptions(FlutterMapboxNavigationPlugin.navigationMode)
                 .applyLanguageAndVoiceUnitOptions(this)
                 .coordinatesList(listOf(originPoint, destination))
                 // provide the bearing for the origin of the request to ensure
