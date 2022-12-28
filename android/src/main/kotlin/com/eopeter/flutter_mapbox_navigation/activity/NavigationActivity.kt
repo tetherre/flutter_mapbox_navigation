@@ -16,8 +16,6 @@ import com.eopeter.flutter_mapbox_navigation.models.MapBoxRouteProgressEvent
 import com.eopeter.flutter_mapbox_navigation.utilities.PluginUtilities
 import com.eopeter.flutter_mapbox_navigation.utilities.PluginUtilities.Companion.sendEvent
 
-import com.mapbox.api.directions.v5.models.*
-
 import com.mapbox.api.directions.v5.models.Bearing
 import com.mapbox.api.directions.v5.models.DirectionsRoute
 import com.mapbox.api.directions.v5.models.RouteOptions
@@ -86,7 +84,8 @@ import android.util.Log
 
 class NavigationActivity : AppCompatActivity() {
 
-    var receiver: BroadcastReceiver? = null
+    var finishBroadcastReceiver: BroadcastReceiver? = null
+    var addWayPointsBroadcastReceiver: BroadcastReceiver? = null
     private var points: MutableList<Point> = mutableListOf()
     private var canResetRoute: Boolean = false
     private var accessToken: String? = null
@@ -100,12 +99,37 @@ class NavigationActivity : AppCompatActivity() {
         accessToken = PluginUtilities.getResourceFromContext(this.applicationContext, "mapbox_access_token")
         mapboxMap = binding.mapView.getMapboxMap()
 
-        receiver = object : BroadcastReceiver() {
+        finishBroadcastReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
+                Log.d("STOP Broadcast", "ENTERED");
                 finish()
             }
         }
-        registerReceiver(receiver, IntentFilter(NavigationLauncher.KEY_STOP_NAVIGATION))
+
+        addWayPointsBroadcastReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                Log.d("onRECEIVE Broadcast", "ENTERED");
+                //get waypoints
+                val stops = intent.getSerializableExtra("waypoints") as? MutableList<Point>
+                val nextIndex = 1
+                if (stops != null) {
+                    // //append to points
+                    // if (points.count() >= nextIndex)
+                    //     points.addAll(nextIndex, stops)
+                    // else
+                    //     points.addAll(stops)
+                    
+                    if (!addedWaypoints.isEmpty)
+                    {
+                        addedWaypoints.removeLast()
+                    }
+                    addWaypoint(stops.last(), null)
+                }
+            }
+        }
+
+        registerReceiver(finishBroadcastReceiver, IntentFilter(NavigationLauncher.KEY_STOP_NAVIGATION))
+        registerReceiver(addWayPointsBroadcastReceiver, IntentFilter(NavigationLauncher.KEY_ADD_WAYPOINTS))
 
         val p = intent.getSerializableExtra("waypoints") as? MutableList<Point>
         if(p != null) points = p
@@ -448,7 +472,7 @@ class NavigationActivity : AppCompatActivity() {
         // to allow for support of all of the Navigation SDK features
         mapboxNavigation.requestRoutes(
             RouteOptions.builder()
-                .applyDefaultNavigationOptions()
+                .applyDefaultNavigationOptions(FlutterMapboxNavigationPlugin.navigationMode)
                 .applyLanguageAndVoiceUnitOptions(this)
                 .coordinatesList(addedWaypoints.coordinatesList())
                 .waypointIndicesList(addedWaypoints.waypointsIndices())
@@ -742,6 +766,7 @@ class NavigationActivity : AppCompatActivity() {
 
         override fun onNewRawLocation(rawLocation: Location) {
             // not handled
+            Log.d("onNewRawLocation - Navigation", rawLocation.toString());
         }
 
         override fun onNewLocationMatcherResult(locationMatcherResult: LocationMatcherResult) {
@@ -788,11 +813,7 @@ class NavigationActivity : AppCompatActivity() {
         val maneuvers = maneuverApi.getManeuvers(routeProgress)
         maneuvers.fold(
             { error ->
-                Toast.makeText(
-                    this@NavigationActivity,
-                    error.errorMessage,
-                    Toast.LENGTH_SHORT
-                ).show()
+                val x = error
             },
             {
                 binding.maneuverView.visibility = View.VISIBLE
@@ -820,8 +841,12 @@ class NavigationActivity : AppCompatActivity() {
      * - routes annotations get refreshed (for example, congestion annotation that indicate the live traffic along the route)
      * - driver got off route and a reroute was executed
      */
-    private val routesObserver = RoutesObserver { routeUpdateResult ->
+    private val routesObserver = RoutesObserver { routeUpdateResult -> 
+
+        speechApi.cancel();
+        voiceInstructionsPlayer.clear();
         if (routeUpdateResult.routes.isNotEmpty()) {
+            
             // generate route geometries asynchronously and render them
             val routeLines = routeUpdateResult.routes.map { RouteLine(it, null) }
 
@@ -881,6 +906,10 @@ class WaypointsSet {
 
     fun clear() {
         waypoints.clear()
+    }
+
+    fun removeLast() {
+        waypoints.removeLast();
     }
 
     /***

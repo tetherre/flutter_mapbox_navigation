@@ -8,32 +8,17 @@ import 'package:flutter/widgets.dart';
 
 import 'models/models.dart';
 
-
 /// Turn-By-Turn Navigation Provider
 class MapBoxNavigation {
-  factory MapBoxNavigation({ValueSetter<RouteEvent>? onRouteEvent}) {
-    if (_instance == null) {
-      final MethodChannel methodChannel =
+  static final MethodChannel _methodChannel =
       const MethodChannel('flutter_mapbox_navigation');
-      final EventChannel eventChannel =
+  static final EventChannel _eventChannel =
       const EventChannel('flutter_mapbox_navigation/events');
-      _instance =
-          MapBoxNavigation.private(methodChannel, eventChannel, onRouteEvent);
-    }
-    return _instance!;
-  }
 
-  @visibleForTesting
-  MapBoxNavigation.private(
-      this._methodChannel, this._routeEventchannel, this._routeEventNotifier);
+  static final MapBoxNavigation _instance = MapBoxNavigation();
+  static MapBoxNavigation get instance => _instance;
 
-  static MapBoxNavigation? _instance;
-
-  final MethodChannel _methodChannel;
-  final EventChannel _routeEventchannel;
-  final ValueSetter<RouteEvent>? _routeEventNotifier;
-
-  Stream<RouteEvent>? _onRouteEvent;
+  late MapBoxOptions defaultOptions;
   late StreamSubscription<RouteEvent> _routeEventSubscription;
 
   ///Current Device OS Version
@@ -51,49 +36,51 @@ class MapBoxNavigation {
       .invokeMethod<double?>('getDurationRemaining')
       .then<double?>((dynamic result) => result);
 
+  ///Adds waypoints or stops to an on-going navigation
+  ///
+  /// [wayPoints] must not be null and have at least 1 item. The way points will
+  /// be inserted after the currently navigating waypoint in the existing navigation
+  Future addWayPoints({required wayPoints}) async {
+    assert(wayPoints.length > 0);
+    List<Map<String, Object?>> pointList =
+        _getPointListFromWayPoints(wayPoints);
+    var i = 0;
+    var wayPointMap =
+        Map.fromIterable(pointList, key: (e) => i++, value: (e) => e);
+    var args = Map<String, dynamic>();
+    args["wayPoints"] = wayPointMap;
+    await _methodChannel
+        .invokeMethod('addWayPoints', args)
+        .then<String>((dynamic result) => result);
+  }
+
   ///Show the Navigation View and Begins Direction Routing
   ///
   /// [wayPoints] must not be null and have at least 2 items. A collection of [WayPoint](longitude, latitude and name). Must be at least 2 or at most 25. Cannot use drivingWithTraffic mode if more than 3-waypoints.
   /// [options] options used to generate the route and used while navigating
   /// Begins to generate Route Progress
   ///
-  int currentLegIndex = 0;
-  int legsCount = 0;
   Future startNavigation(
-      {required List<WayPoint> wayPoints,
-        required MapBoxOptions options}) async {
+      {required List<WayPoint> wayPoints, MapBoxOptions? options}) async {
     assert(wayPoints.length > 1);
+    if (options == null) {
+      options = defaultOptions;
+    }
     if (Platform.isIOS && wayPoints.length > 3) {
       assert(options.mode != MapBoxNavigationMode.drivingWithTraffic,
-      "Error: Cannot use drivingWithTraffic Mode when you have more than 3 Stops");
+          "Error: Cannot use drivingWithTraffic Mode when you have more than 3 Stops");
     }
-    List<Map<String, Object?>> pointList = [];
 
-    for (int i = 0; i < wayPoints.length; i++) {
-      var wayPoint = wayPoints[i];
-      assert(wayPoint.name != null);
-      assert(wayPoint.latitude != null);
-      assert(wayPoint.longitude != null);
-
-      final pointMap = <String, dynamic>{
-        "Order": i,
-        "Name": wayPoint.name,
-        "Latitude": wayPoint.latitude,
-        "Longitude": wayPoint.longitude,
-      };
-      pointList.add(pointMap);
-    }
+    List<Map<String, Object?>> pointList =
+        _getPointListFromWayPoints(wayPoints);
     var i = 0;
     var wayPointMap =
-    Map.fromIterable(pointList, key: (e) => i++, value: (e) => e);
+        Map.fromIterable(pointList, key: (e) => i++, value: (e) => e);
 
     var args = options.toMap();
     args["wayPoints"] = wayPointMap;
 
-    currentLegIndex = 0;
-    legsCount = wayPoints.length - 1;
-
-    _routeEventSubscription = _streamRouteEvent!.listen(_onProgressData);
+    _routeEventSubscription = routeEventsListener!.listen(_onProgressData);
     await _methodChannel
         .invokeMethod('startNavigation', args)
         .then<String>((dynamic result) => result);
@@ -108,29 +95,31 @@ class MapBoxNavigation {
   /// Will download the navigation engine and the user's region to allow offline routing
   Future<bool?> enableOfflineRouting() async {
     var success =
-    await _methodChannel.invokeMethod('enableOfflineRouting', null);
+        await _methodChannel.invokeMethod('enableOfflineRouting', null);
     return success;
   }
 
+  late ValueSetter<RouteEvent>? onRouteEvent;
   void _onProgressData(RouteEvent event) {
-    if (_routeEventNotifier != null) _routeEventNotifier!(event);
-
-    if (event.eventType == MapBoxEvent.on_arrival) {
-      if (currentLegIndex >= legsCount - 1)
+    if (onRouteEvent != null) onRouteEvent!(event);
+    switch (event.eventType) {
+      case MapBoxEvent.navigation_finished:
         _routeEventSubscription.cancel();
-      else
-        currentLegIndex++;
-    } else if (event.eventType == MapBoxEvent.navigation_finished)
-      _routeEventSubscription.cancel();
+        break;
+      default:
+        break;
+    }
   }
 
-  Stream<RouteEvent>? get _streamRouteEvent {
-    if (_onRouteEvent == null) {
-      _onRouteEvent = _routeEventchannel
+  Stream<RouteEvent>? _routeEventsListener;
+
+  Stream<RouteEvent>? get routeEventsListener {
+    if (_routeEventsListener == null) {
+      _routeEventsListener = _eventChannel
           .receiveBroadcastStream()
           .map((dynamic event) => _parseRouteEvent(event));
     }
-    return _onRouteEvent;
+    return _routeEventsListener;
   }
 
   RouteEvent _parseRouteEvent(String jsonString) {
@@ -144,5 +133,26 @@ class MapBoxNavigation {
       event = RouteEvent.fromJson(map);
     return event;
   }
-}
 
+  List<Map<String, Object?>> _getPointListFromWayPoints(
+      List<WayPoint> wayPoints) {
+    List<Map<String, Object?>> pointList = [];
+
+    for (int i = 0; i < wayPoints.length; i++) {
+      var wayPoint = wayPoints[i];
+      assert(wayPoint.name != null);
+      assert(wayPoint.latitude != null);
+      assert(wayPoint.longitude != null);
+
+      final pointMap = <String, dynamic>{
+        "Order": i,
+        "Name": wayPoint.name,
+        "Latitude": wayPoint.latitude,
+        "Longitude": wayPoint.longitude,
+        "IsSilent": wayPoint.isSilent,
+      };
+      pointList.add(pointMap);
+    }
+    return pointList;
+  }
+}
