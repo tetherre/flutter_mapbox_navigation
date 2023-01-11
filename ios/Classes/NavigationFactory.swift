@@ -149,7 +149,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
 
         options.distanceMeasurementSystem = _voiceUnits == "imperial" ? .imperial : .metric
         options.locale = Locale(identifier: _language)
-
+        
         Directions.shared.calculate(options) { [weak self](session, result) in
             guard let strongSelf = self else { return }
             strongSelf._options = options
@@ -182,6 +182,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                     }
                     let navigationOptions = NavigationOptions(styles: [dayStyle, nightStyle], navigationService: navigationService)
                     if (isUpdatingWaypoints) {
+                        navigationOptions.voiceController?.speechSynthesizer.interruptSpeaking()
                         strongSelf._navigationViewController?.navigationService.router.updateRoute(with: IndexedRouteResponse(routeResponse: response, routeIndex: 0), routeOptions: strongSelf._options) { success in
                             if (success) {
                                 flutterResult("true")

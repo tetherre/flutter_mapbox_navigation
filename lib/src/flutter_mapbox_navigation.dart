@@ -99,7 +99,7 @@ class MapBoxNavigation {
     return success;
   }
 
-  late ValueSetter<RouteEvent>? onRouteEvent;
+  ValueSetter<RouteEvent>? onRouteEvent;
   void _onProgressData(RouteEvent event) {
     if (onRouteEvent != null) onRouteEvent!(event);
     switch (event.eventType) {
