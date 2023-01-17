@@ -89,6 +89,7 @@ class NavigationActivity : AppCompatActivity() {
     private var points: MutableList<Point> = mutableListOf()
     private var canResetRoute: Boolean = false
     private var accessToken: String? = null
+    private var routeIndex: Int = 0
 
     @SuppressLint("MissingPermission")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -118,9 +119,8 @@ class NavigationActivity : AppCompatActivity() {
                     //     points.addAll(nextIndex, stops)
                     // else
                     //     points.addAll(stops)
-                    
-                    if (!addedWaypoints.isEmpty)
-                    {
+
+                    if (!addedWaypoints.isEmpty) {
                         addedWaypoints.removeLast()
                     }
                     addWaypoint(stops.last(), null)
@@ -132,15 +132,15 @@ class NavigationActivity : AppCompatActivity() {
         registerReceiver(addWayPointsBroadcastReceiver, IntentFilter(NavigationLauncher.KEY_ADD_WAYPOINTS))
 
         val p = intent.getSerializableExtra("waypoints") as? MutableList<Point>
-        if(p != null) points = p
+        if (p != null) points = p
 
         // initialize the location puck
         binding.mapView.location.apply {
             this.locationPuck = LocationPuck2D(
-                bearingImage = ContextCompat.getDrawable(
-                    this@NavigationActivity,
-                    R.drawable.mapbox_navigation_puck_icon
-                )
+                    bearingImage = ContextCompat.getDrawable(
+                            this@NavigationActivity,
+                            R.drawable.mapbox_navigation_puck_icon
+                    )
             )
             setLocationProvider(navigationLocationProvider)
             enabled = true
@@ -150,19 +150,19 @@ class NavigationActivity : AppCompatActivity() {
         mapboxNavigation = if (MapboxNavigationProvider.isCreated()) {
             MapboxNavigationProvider.retrieve()
         } else {
-            if (FlutterMapboxNavigationPlugin.simulateRoute){
+            if (FlutterMapboxNavigationPlugin.simulateRoute) {
                 MapboxNavigationProvider.create(
-                    NavigationOptions.Builder(this.applicationContext)
-                        .accessToken(accessToken)
-                        // comment out the location engine setting block to disable simulation
-                        .locationEngine(replayLocationEngine)
-                        .build()
+                        NavigationOptions.Builder(this.applicationContext)
+                                .accessToken(accessToken)
+                                // comment out the location engine setting block to disable simulation
+                                .locationEngine(replayLocationEngine)
+                                .build()
                 )
-            }else{
+            } else {
                 MapboxNavigationProvider.create(
-                    NavigationOptions.Builder(this.applicationContext)
-                        .accessToken(accessToken)
-                        .build()
+                        NavigationOptions.Builder(this.applicationContext)
+                                .accessToken(accessToken)
+                                .build()
                 )
             }
 
@@ -171,14 +171,14 @@ class NavigationActivity : AppCompatActivity() {
         // initialize Navigation Camera
         viewportDataSource = MapboxNavigationViewportDataSource(mapboxMap)
         navigationCamera = NavigationCamera(
-            mapboxMap,
-            binding.mapView.camera,
-            viewportDataSource
+                mapboxMap,
+                binding.mapView.camera,
+                viewportDataSource
         )
         // set the animations lifecycle listener to ensure the NavigationCamera stops
         // automatically following the user location when the map is interacted with
         binding.mapView.camera.addCameraAnimationsLifecycleListener(
-            NavigationBasicGesturesHandler(navigationCamera)
+                NavigationBasicGesturesHandler(navigationCamera)
         )
         navigationCamera.registerNavigationCameraStateChangeObserver { navigationCameraState ->
             // shows/hide the recenter button depending on the camera state
@@ -207,37 +207,37 @@ class NavigationActivity : AppCompatActivity() {
 
         // initialize maneuver api that feeds the data to the top banner maneuver view
         maneuverApi = MapboxManeuverApi(
-            MapboxDistanceFormatter(distanceFormatterOptions)
+                MapboxDistanceFormatter(distanceFormatterOptions)
         )
 
         // initialize bottom progress view
         tripProgressApi = MapboxTripProgressApi(
-            TripProgressUpdateFormatter.Builder(this)
-                .distanceRemainingFormatter(
-                    DistanceRemainingFormatter(distanceFormatterOptions)
-                )
-                .timeRemainingFormatter(
-                    TimeRemainingFormatter(this)
-                )
-                .percentRouteTraveledFormatter(
-                    PercentDistanceTraveledFormatter()
-                )
-                .estimatedTimeToArrivalFormatter(
-                    EstimatedTimeToArrivalFormatter(this, TimeFormat.NONE_SPECIFIED)
-                )
-                .build()
+                TripProgressUpdateFormatter.Builder(this)
+                        .distanceRemainingFormatter(
+                                DistanceRemainingFormatter(distanceFormatterOptions)
+                        )
+                        .timeRemainingFormatter(
+                                TimeRemainingFormatter(this)
+                        )
+                        .percentRouteTraveledFormatter(
+                                PercentDistanceTraveledFormatter()
+                        )
+                        .estimatedTimeToArrivalFormatter(
+                                EstimatedTimeToArrivalFormatter(this, TimeFormat.NONE_SPECIFIED)
+                        )
+                        .build()
         )
 
         // initialize voice instructions api and the voice instruction player
         speechApi = MapboxSpeechApi(
-            this,
-            accessToken!!,
-            Locale.US.language
+                this,
+                accessToken!!,
+                Locale.US.language
         )
         voiceInstructionsPlayer = MapboxVoiceInstructionsPlayer(
-            this,
-            accessToken!!,
-            Locale.US.language
+                this,
+                accessToken!!,
+                Locale.US.language
         )
 
         // initialize route line, the withRouteLineBelowLayerId is specified to place
@@ -245,8 +245,8 @@ class NavigationActivity : AppCompatActivity() {
         // the value of this option will depend on the style that you are using
         // and under which layer the route line should be placed on the map layers stack
         val mapboxRouteLineOptions = MapboxRouteLineOptions.Builder(this)
-            .withRouteLineBelowLayerId("road-label")
-            .build()
+                .withRouteLineBelowLayerId("road-label")
+                .build()
         routeLineApi = MapboxRouteLineApi(mapboxRouteLineOptions)
         routeLineView = MapboxRouteLineView(mapboxRouteLineOptions)
 
@@ -258,10 +258,9 @@ class NavigationActivity : AppCompatActivity() {
         if (styleUrl == null) styleUrl = Style.MAPBOX_STREETS
         // load map style
         mapboxMap.loadStyleUri(
-            styleUrl
+                styleUrl
         ) {
-            if(FlutterMapboxNavigationPlugin.allowsClickToSetDestination)
-            {
+            if (FlutterMapboxNavigationPlugin.allowsClickToSetDestination) {
                 // add long click listener that search for a route to the clicked destination
                 binding.mapView.gestures.addOnMapLongClickListener { point ->
                     findRoute(point)
@@ -311,12 +310,12 @@ class NavigationActivity : AppCompatActivity() {
             // but we're not simulating yet,
             // push a single location sample to establish origin
             mapboxReplayer.pushEvents(
-                listOf(
-                    ReplayRouteMapper.mapToUpdateLocation(
-                        eventTimestamp = 0.0,
-                        point = Point.fromLngLat(-122.39726512303575, 37.785128345296805)
+                    listOf(
+                            ReplayRouteMapper.mapToUpdateLocation(
+                                    eventTimestamp = 0.0,
+                                    point = Point.fromLngLat(-122.39726512303575, 37.785128345296805)
+                            )
                     )
-                )
             )
             mapboxReplayer.playFirstLocation()
         }
@@ -356,11 +355,12 @@ class NavigationActivity : AppCompatActivity() {
         // that make sure the route request is optimized
         // to allow for support of all of the Navigation SDK features
         val routeOptions = RouteOptions.builder()
-            .applyDefaultNavigationOptions(FlutterMapboxNavigationPlugin.navigationMode)
-            .applyLanguageAndVoiceUnitOptions(this)
-            .coordinatesList(listOf(originPoint, destination))
-            // provide the bearing for the origin of the request to ensure
-            // that the returned route faces in the direction of the current user movement
+                .applyDefaultNavigationOptions(FlutterMapboxNavigationPlugin.navigationMode)
+                .applyLanguageAndVoiceUnitOptions(this)
+                .coordinatesList(listOf(originPoint, destination))
+                .alternatives(true)
+                // provide the bearing for the origin of the request to ensure
+                // that the returned route faces in the direction of the current user movement
             .bearingsList(
                 listOf(
                     Bearing.builder()
@@ -371,28 +371,28 @@ class NavigationActivity : AppCompatActivity() {
                 )
             )
             .layersList(listOf(mapboxNavigation.getZLevel(), null))
-            .build();
+                .build();
         mapboxNavigation.requestRoutes(
-            routeOptions,
-            object : RouterCallback {
-                override fun onRoutesReady(
-                    routes: List<DirectionsRoute>,
-                    routerOrigin: RouterOrigin
-                ) {
-                    setRouteAndStartNavigation(routes)
-                }
+                routeOptions,
+                object : RouterCallback {
+                    override fun onRoutesReady(
+                            routes: List<DirectionsRoute>,
+                            routerOrigin: RouterOrigin
+                    ) {
+                        setRouteAndStartNavigation(routes)
+                    }
 
-                override fun onFailure(
-                    reasons: List<RouterFailure>,
-                    routeOptions: RouteOptions
-                ) {
-                    // no impl
-                }
+                    override fun onFailure(
+                            reasons: List<RouterFailure>,
+                            routeOptions: RouteOptions
+                    ) {
+                        // no impl
+                    }
 
-                override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
-                    // no impl
+                    override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
+                        // no impl
+                    }
                 }
-            }
         )
     }
 
@@ -404,12 +404,12 @@ class NavigationActivity : AppCompatActivity() {
         // to allow for support of all of the Navigation SDK features
         Log.d("findFirstRoute", "navigationMode: " + FlutterMapboxNavigationPlugin.navigationMode);
         mapboxNavigation.requestRoutes(
-            RouteOptions.builder()
-                .applyDefaultNavigationOptions(FlutterMapboxNavigationPlugin.navigationMode)
-                .applyLanguageAndVoiceUnitOptions(this)
-                .coordinatesList(listOf(originPoint, destination))
-                // provide the bearing for the origin of the request to ensure
-                // that the returned route faces in the direction of the current user movement
+                RouteOptions.builder()
+                        .applyDefaultNavigationOptions(FlutterMapboxNavigationPlugin.navigationMode)
+                        .applyLanguageAndVoiceUnitOptions(this)
+                        .coordinatesList(listOf(originPoint, destination)).alternatives(true)
+                        // provide the bearing for the origin of the request to ensure
+                        // that the returned route faces in the direction of the current user movement
                 .bearingsList(
                     listOf(
                         Bearing.builder()
@@ -420,26 +420,26 @@ class NavigationActivity : AppCompatActivity() {
                     )
                 )
                 .layersList(listOf(mapboxNavigation.getZLevel(), null))
-                .build(),
-            object : RouterCallback {
-                override fun onRoutesReady(
-                    routes: List<DirectionsRoute>,
-                    routerOrigin: RouterOrigin
-                ) {
-                    setRouteAndStartNavigation(routes)
-                }
+                        .build(),
+                object : RouterCallback {
+                    override fun onRoutesReady(
+                            routes: List<DirectionsRoute>,
+                            routerOrigin: RouterOrigin
+                    ) {
+                        setRouteAndStartNavigation(routes)
+                    }
 
-                override fun onFailure(
-                    reasons: List<RouterFailure>,
-                    routeOptions: RouteOptions
-                ) {
-                    // no impl
-                }
+                    override fun onFailure(
+                            reasons: List<RouterFailure>,
+                            routeOptions: RouteOptions
+                    ) {
+                        // no impl
+                    }
 
-                override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
-                    
+                    override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
+
+                    }
                 }
-            }
         )
     }
 
@@ -471,32 +471,32 @@ class NavigationActivity : AppCompatActivity() {
         // that make sure the route request is optimized
         // to allow for support of all of the Navigation SDK features
         mapboxNavigation.requestRoutes(
-            RouteOptions.builder()
-                .applyDefaultNavigationOptions(FlutterMapboxNavigationPlugin.navigationMode)
-                .applyLanguageAndVoiceUnitOptions(this)
-                .coordinatesList(addedWaypoints.coordinatesList())
-                .waypointIndicesList(addedWaypoints.waypointsIndices())
-                .waypointNamesList(addedWaypoints.waypointsNames())
-                .build(),
-            object : RouterCallback {
-                override fun onRoutesReady(
-                    routes: List<DirectionsRoute>,
-                    routerOrigin: RouterOrigin
-                ) {
-                    setRoute(routes)
-                }
+                RouteOptions.builder()
+                        .applyDefaultNavigationOptions(FlutterMapboxNavigationPlugin.navigationMode)
+                        .applyLanguageAndVoiceUnitOptions(this)
+                        .coordinatesList(addedWaypoints.coordinatesList())
+                        .waypointIndicesList(addedWaypoints.waypointsIndices())
+                        .waypointNamesList(addedWaypoints.waypointsNames())
+                        .build(),
+                object : RouterCallback {
+                    override fun onRoutesReady(
+                            routes: List<DirectionsRoute>,
+                            routerOrigin: RouterOrigin
+                    ) {
+                        setRoute(routes)
+                    }
 
-                override fun onFailure(
-                    reasons: List<RouterFailure>,
-                    routeOptions: RouteOptions
-                ) {
-                    // no impl
-                }
+                    override fun onFailure(
+                            reasons: List<RouterFailure>,
+                            routeOptions: RouteOptions
+                    ) {
+                        // no impl
+                    }
 
-                override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
-                    // no impl
+                    override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
+                        // no impl
+                    }
                 }
-            }
         )
     }
 
@@ -519,7 +519,9 @@ class NavigationActivity : AppCompatActivity() {
     private fun setRouteAndStartNavigation(routes: List<DirectionsRoute>) {
         // set routes, where the first route in the list is the primary route that
         // will be used for active guidance
-        mapboxNavigation.setRoutes(routes)
+        val index = intent.getSerializableExtra("routeIndex") as? Int
+        routeIndex = index ?: 0
+        mapboxNavigation.setRoutes(listOf(routes[routeIndex]))
 
         // start location simulation along the primary route
         startSimulation(routes.first())
@@ -545,7 +547,7 @@ class NavigationActivity : AppCompatActivity() {
         binding.maneuverView.visibility = View.INVISIBLE
         binding.routeOverview.visibility = View.INVISIBLE
         binding.tripProgressCard.visibility = View.INVISIBLE
-        
+
         finish();
     }
 
@@ -620,34 +622,34 @@ class NavigationActivity : AppCompatActivity() {
     private val pixelDensity = Resources.getSystem().displayMetrics.density
     private val overviewPadding: EdgeInsets by lazy {
         EdgeInsets(
-            140.0 * pixelDensity,
-            40.0 * pixelDensity,
-            120.0 * pixelDensity,
-            40.0 * pixelDensity
+                140.0 * pixelDensity,
+                40.0 * pixelDensity,
+                120.0 * pixelDensity,
+                40.0 * pixelDensity
         )
     }
     private val landscapeOverviewPadding: EdgeInsets by lazy {
         EdgeInsets(
-            30.0 * pixelDensity,
-            380.0 * pixelDensity,
-            110.0 * pixelDensity,
-            20.0 * pixelDensity
+                30.0 * pixelDensity,
+                380.0 * pixelDensity,
+                110.0 * pixelDensity,
+                20.0 * pixelDensity
         )
     }
     private val followingPadding: EdgeInsets by lazy {
         EdgeInsets(
-            180.0 * pixelDensity,
-            40.0 * pixelDensity,
-            150.0 * pixelDensity,
-            40.0 * pixelDensity
+                180.0 * pixelDensity,
+                40.0 * pixelDensity,
+                150.0 * pixelDensity,
+                40.0 * pixelDensity
         )
     }
     private val landscapeFollowingPadding: EdgeInsets by lazy {
         EdgeInsets(
-            30.0 * pixelDensity,
-            380.0 * pixelDensity,
-            110.0 * pixelDensity,
-            40.0 * pixelDensity
+                30.0 * pixelDensity,
+                380.0 * pixelDensity,
+                110.0 * pixelDensity,
+                40.0 * pixelDensity
         )
     }
 
@@ -721,33 +723,33 @@ class NavigationActivity : AppCompatActivity() {
      * or uses the fall back which is played back using the on-device Text-To-Speech engine.
      */
     private val speechCallback =
-        MapboxNavigationConsumer<Expected<SpeechError, SpeechValue>> { expected ->
-            expected.fold(
-                { error ->
-                    // play the instruction via fallback text-to-speech engine
-                    voiceInstructionsPlayer.play(
-                        error.fallback,
-                        voiceInstructionsPlayerCallback
-                    )
-                },
-                { value ->
-                    // play the sound file from the external generator
-                    voiceInstructionsPlayer.play(
-                        value.announcement,
-                        voiceInstructionsPlayerCallback
-                    )
-                }
-            )
-        }
+            MapboxNavigationConsumer<Expected<SpeechError, SpeechValue>> { expected ->
+                expected.fold(
+                        { error ->
+                            // play the instruction via fallback text-to-speech engine
+                            voiceInstructionsPlayer.play(
+                                    error.fallback,
+                                    voiceInstructionsPlayerCallback
+                            )
+                        },
+                        { value ->
+                            // play the sound file from the external generator
+                            voiceInstructionsPlayer.play(
+                                    value.announcement,
+                                    voiceInstructionsPlayerCallback
+                            )
+                        }
+                )
+            }
 
     /**
      * When a synthesized audio file was downloaded, this callback cleans up the disk after it was played.
      */
     private val voiceInstructionsPlayerCallback =
-        MapboxNavigationConsumer<SpeechAnnouncement> { value ->
-            // remove already consumed file to free-up space
-            speechApi.clean(value)
-        }
+            MapboxNavigationConsumer<SpeechAnnouncement> { value ->
+                // remove already consumed file to free-up space
+                speechApi.clean(value)
+            }
 
     /**
      * [NavigationLocationProvider] is a utility class that helps to provide location updates generated by the Navigation SDK
@@ -773,8 +775,8 @@ class NavigationActivity : AppCompatActivity() {
             val enhancedLocation = locationMatcherResult.enhancedLocation
             // update location puck's position on the map
             navigationLocationProvider.changePosition(
-                location = enhancedLocation,
-                keyPoints = locationMatcherResult.keyPoints,
+                    location = enhancedLocation,
+                    keyPoints = locationMatcherResult.keyPoints,
             )
 
             // update camera position to account for new location
@@ -786,9 +788,9 @@ class NavigationActivity : AppCompatActivity() {
             if (!firstLocationUpdateReceived) {
                 firstLocationUpdateReceived = true
                 navigationCamera.requestNavigationCameraToOverview(
-                    stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
-                        .maxDuration(0) // instant transition
-                        .build()
+                        stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
+                                .maxDuration(0) // instant transition
+                                .build()
                 )
             }
         }
@@ -812,13 +814,13 @@ class NavigationActivity : AppCompatActivity() {
         // update top banner with maneuver instructions
         val maneuvers = maneuverApi.getManeuvers(routeProgress)
         maneuvers.fold(
-            { error ->
-                val x = error
-            },
-            {
-                binding.maneuverView.visibility = View.VISIBLE
-                binding.maneuverView.renderManeuvers(maneuvers)
-            }
+                { error ->
+                    val x = error
+                },
+                {
+                    binding.maneuverView.visibility = View.VISIBLE
+                    binding.maneuverView.renderManeuvers(maneuvers)
+                }
         )
 
         //Notify the client
@@ -829,7 +831,7 @@ class NavigationActivity : AppCompatActivity() {
 
         // update bottom trip progress summary
         binding.tripProgressView.render(
-            tripProgressApi.getTripProgress(routeProgress)
+                tripProgressApi.getTripProgress(routeProgress)
         )
     }
 
@@ -841,17 +843,17 @@ class NavigationActivity : AppCompatActivity() {
      * - routes annotations get refreshed (for example, congestion annotation that indicate the live traffic along the route)
      * - driver got off route and a reroute was executed
      */
-    private val routesObserver = RoutesObserver { routeUpdateResult -> 
+    private val routesObserver = RoutesObserver { routeUpdateResult ->
 
         speechApi.cancel();
         voiceInstructionsPlayer.clear();
         if (routeUpdateResult.routes.isNotEmpty()) {
-            
+
             // generate route geometries asynchronously and render them
             val routeLines = routeUpdateResult.routes.map { RouteLine(it, null) }
 
             routeLineApi.setRoutes(
-                routeLines
+                    routeLines
             ) { value ->
                 mapboxMap.getStyle()?.apply {
                     routeLineView.renderRouteDrawData(this, value)
@@ -867,8 +869,8 @@ class NavigationActivity : AppCompatActivity() {
             if (style != null) {
                 routeLineApi.clearRouteLine { value ->
                     routeLineView.renderClearRouteLineValue(
-                        style,
-                        value
+                            style,
+                            value
                     )
                 }
                 routeArrowView.render(style, routeArrowApi.clearArrows())
@@ -931,16 +933,16 @@ class WaypointsSet {
      * First and last waypoint can't be silent.
      */
     fun waypointsNames(): List<String> = waypoints
-        // silent waypoints can't have a name
-        .filterIndexed { index, _ ->
-            !waypoints.isSilentWaypoint(index)
-        }
-        .map {
-            when (it.type) {
-                is WaypointType.Named -> it.type.name
-                else -> ""
+            // silent waypoints can't have a name
+            .filterIndexed { index, _ ->
+                !waypoints.isSilentWaypoint(index)
             }
-        }
+            .map {
+                when (it.type) {
+                    is WaypointType.Named -> it.type.name
+                    else -> ""
+                }
+            }
 
     fun coordinatesList(): List<Point> {
         return waypoints.map { it.point }
@@ -955,7 +957,7 @@ class WaypointsSet {
     private data class Waypoint(val point: Point, val type: WaypointType)
 
     private fun List<Waypoint>.isSilentWaypoint(index: Int) =
-        this[index].type == WaypointType.Silent && canWaypointBeSilent(index)
+            this[index].type == WaypointType.Silent && canWaypointBeSilent(index)
 
     // the first and the last waypoint can't be silent
     private fun List<Waypoint>.canWaypointBeSilent(index: Int): Boolean {

@@ -70,6 +70,7 @@ public class FlutterMapboxNavigationPlugin: FlutterPlugin, MethodCallHandler, Ev
     var zoom = 15.0
     var bearing = 0.0
     var tilt = 0.0
+    var routeIndex = 0
     var distanceRemaining: Float? = null
     var durationRemaining: Double? = null
     var platformViewRegistry: PlatformViewRegistry? = null
@@ -149,6 +150,10 @@ public class FlutterMapboxNavigationPlugin: FlutterPlugin, MethodCallHandler, Ev
     if(language != null)
       navigationLanguage = language
 
+    val navigationRouteIndex = arguments?.get("routeIndex") as? Int
+    if(navigationRouteIndex != null)
+      routeIndex = navigationRouteIndex
+
     val units = arguments?.get("units") as? String
 
     if(units != null)
@@ -195,7 +200,7 @@ public class FlutterMapboxNavigationPlugin: FlutterPlugin, MethodCallHandler, Ev
 
   private fun beginNavigation(wayPoints: List<Point>)
   {
-      NavigationLauncher.startNavigation(currentActivity, wayPoints);
+      NavigationLauncher.startNavigation(currentActivity, wayPoints, routeIndex);
   }
 
   private fun addWayPointsToNavigation(@NonNull call: MethodCall, @NonNull result: MethodChannel.Result) {

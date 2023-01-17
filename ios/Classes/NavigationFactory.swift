@@ -33,6 +33,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     var _zoom: Double = 13.0
     var _tilt: Double = 0.0
     var _bearing: Double = 0.0
+    var _routeIndex: Int = 0
     var _animateBuildRoute = true
     var _longPressDestinationEnabled = true
     var _shouldReRoute = true
@@ -95,6 +96,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         }
 
         _language = arguments?["language"] as? String ?? _language
+        _routeIndex = arguments?["routeIndex"] as? Int ?? _routeIndex
         _voiceUnits = arguments?["units"] as? String ?? _voiceUnits
         _simulateRoute = arguments?["simulateRoute"] as? Bool ?? _simulateRoute
         _isOptimized = arguments?["isOptimized"] as? Bool ?? _isOptimized
@@ -171,7 +173,8 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                 }
                 else
                 {
-                    let navigationService = MapboxNavigationService(routeResponse: response, routeIndex: 0, routeOptions: options, simulating: simulationMode)
+
+                    let navigationService = MapboxNavigationService(routeResponse: response, routeIndex: strongSelf._routeIndex, routeOptions: options, simulating: simulationMode)
                     var dayStyle = CustomDayStyle()
                     if(strongSelf._mapStyleUrlDay != nil){
                         dayStyle = CustomDayStyle(url: strongSelf._mapStyleUrlDay)
@@ -183,7 +186,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
                     let navigationOptions = NavigationOptions(styles: [dayStyle, nightStyle], navigationService: navigationService)
                     if (isUpdatingWaypoints) {
                         navigationOptions.voiceController?.speechSynthesizer.interruptSpeaking()
-                        strongSelf._navigationViewController?.navigationService.router.updateRoute(with: IndexedRouteResponse(routeResponse: response, routeIndex: 0), routeOptions: strongSelf._options) { success in
+                        strongSelf._navigationViewController?.navigationService.router.updateRoute(with: IndexedRouteResponse(routeResponse: response, routeIndex: strongSelf._routeIndex), routeOptions: strongSelf._options) { success in
                             if (success) {
                                 flutterResult("true")
                             } else {
@@ -205,7 +208,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
         isEmbeddedNavigation = false
         if(self._navigationViewController == nil)
         {
-            self._navigationViewController = NavigationViewController(for: routeResponse, routeIndex: 0, routeOptions: options, navigationOptions: navOptions)
+            self._navigationViewController = NavigationViewController(for: routeResponse, routeIndex: self._routeIndex, routeOptions: options, navigationOptions: navOptions)
             self._navigationViewController!.modalPresentationStyle = .fullScreen
             self._navigationViewController!.delegate = self
             self._navigationViewController!.navigationMapView!.localizeLabels()

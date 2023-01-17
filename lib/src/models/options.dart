@@ -51,6 +51,7 @@ class MapBoxOptions {
   final bool? voiceInstructionsEnabled;
   //if true, banner instruction is shown and returned
   final bool? bannerInstructionsEnabled;
+  final int? routeIndex;
 
   /// if true will simulate the route as if you were driving. Always true on iOS Simulator
   final bool? simulateRoute;
@@ -98,6 +99,7 @@ class MapBoxOptions {
       this.mapStyleUrlNight,
       this.enableFreeDriveMode,
       this.padding,
+      this.routeIndex,
       this.animateBuildRoute});
 
   Map<String, dynamic> toMap() {
@@ -138,6 +140,7 @@ class MapBoxOptions {
     if (this.simulateRoute != null)
       optionsMap['simulateRoute'] = this.simulateRoute;
     if (this.isOptimized != null) optionsMap['isOptimized'] = this.isOptimized;
+    if (this.routeIndex != null) optionsMap['routeIndex'] = this.routeIndex;
 
     addIfNonNull('padding', <double?>[
       padding?.top,
