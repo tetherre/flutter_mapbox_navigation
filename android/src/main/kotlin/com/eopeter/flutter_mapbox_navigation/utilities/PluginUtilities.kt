@@ -9,7 +9,7 @@ import com.eopeter.flutter_mapbox_navigation.FlutterMapboxNavigationPlugin
 import com.eopeter.flutter_mapbox_navigation.models.MapBoxEvents
 import com.eopeter.flutter_mapbox_navigation.models.MapBoxRouteProgressEvent
 import com.google.gson.Gson
-import com.mapbox.mapboxsdk.geometry.LatLng
+import com.mapbox.geojson.Point
 import io.flutter.plugin.common.MethodCall
 import java.io.ByteArrayInputStream
 import java.io.InputStream
@@ -26,13 +26,13 @@ class PluginUtilities {
             return context.getString(stringRes)
         }
 
-        fun getRandomLatLng(bbox: DoubleArray): LatLng {
+        fun getRandomLatLng(bbox: DoubleArray): Point {
             val random = Random()
 
             val randomLat: Double = bbox.get(1) + (bbox.get(3) - bbox.get(1)) * random.nextDouble()
             val randomLon: Double = bbox.get(0) + (bbox.get(2) - bbox.get(0)) * random.nextDouble()
 
-            val latLng = LatLng(randomLat, randomLon)
+            val latLng = Point.fromLngLat(randomLat, randomLon)
             return latLng
         }
 

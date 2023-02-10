@@ -21,7 +21,6 @@ import com.mapbox.api.directions.v5.models.RouteOptions
 
 import com.mapbox.bindgen.Expected
 import com.mapbox.geojson.Point
-import com.mapbox.mapboxsdk.geometry.LatLng
 import com.mapbox.maps.*
 import com.mapbox.maps.plugin.LocationPuck2D
 import com.mapbox.maps.plugin.animation.MapAnimationOptions
@@ -398,7 +397,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         currentRoute?.let {
             val originCoordinate = it.routeOptions()?.coordinatesList()?.get(0)
             originCoordinate?.let {
-                val location = LatLng(originCoordinate.latitude(), originCoordinate.longitude())
+                val location = Point.fromLngLat(originCoordinate.latitude(), originCoordinate.longitude())
                 //moveCameraTo(location)
                 //addCustomMarker(location)
             }
