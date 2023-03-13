@@ -13,6 +13,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     let ALLOW_ROUTE_SELECTION = false
     let IsMultipleUniqueRoutes = false
     var isEmbeddedNavigation = false
+    var isLastWaypoint = false
 
     var _distanceRemaining: Double?
     var _durationRemaining: Double?
@@ -49,7 +50,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             locations.sort(by: {$0.order ?? 0 < $1.order ?? 0})
         }
 
-        print(_wayPoints);
+        print(_wayPoints)
 
         if (_wayPoints.count > 1) {
             _wayPoints.removeLast()
@@ -74,6 +75,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
     
     func startNavigation(arguments: NSDictionary?, result: @escaping FlutterResult)
     {
+        print("START NAVIGATION")
         _wayPoints.removeAll()
         _wayPointOrder.removeAll()
 
@@ -212,9 +214,15 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             self._navigationViewController!.modalPresentationStyle = .fullScreen
             self._navigationViewController!.delegate = self
             self._navigationViewController!.navigationMapView!.localizeLabels()
+            self._navigationViewController!.showsEndOfRouteFeedback = false;
         }
         let flutterViewController = UIApplication.shared.delegate?.window??.rootViewController as! FlutterViewController
         flutterViewController.present(self._navigationViewController!, animated: true, completion: nil)
+    }
+    
+    func continueFreeNavigation() {
+        self._navigationViewController!.navigationMapView!.removeRoutes()
+        self._navigationViewController!.navigationMapView!.removeWaypoints()
     }
 
     func continueNavigationWithWayPoints(wayPoints: [Waypoint])
@@ -361,6 +369,7 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
 
 extension NavigationFactory : NavigationViewControllerDelegate {
     //MARK: NavigationViewController Delegates
+    
     public func navigationViewController(_ navigationViewController: NavigationViewController, didUpdate progress: RouteProgress, with location: CLLocation, rawLocation: CLLocation) {
         _lastKnownLocation = location
         _distanceRemaining = progress.distanceRemaining
@@ -385,17 +394,19 @@ extension NavigationFactory : NavigationViewControllerDelegate {
     }
 
     public func navigationViewController(_ navigationViewController: NavigationViewController, didArriveAt waypoint: Waypoint) -> Bool {
+        
         sendEvent(eventType: MapBoxEventType.on_arrival, data: "true")
         if(!_wayPoints.isEmpty && IsMultipleUniqueRoutes)
         {
+            isLastWaypoint = false;
             continueNavigationWithWayPoints(wayPoints: [getLastKnownLocation(), _wayPoints.remove(at: 0)])
             return false
         }
-
+        
+        isLastWaypoint = true;
+        continueFreeNavigation()
         return true
     }
-
-
 
     public func navigationViewControllerDidDismiss(_ navigationViewController: NavigationViewController, byCanceling canceled: Bool) {
         if(canceled)
@@ -406,6 +417,11 @@ extension NavigationFactory : NavigationViewControllerDelegate {
     }
     
     public func navigationViewController(_ navigationViewController: NavigationViewController, shouldRerouteFrom location: CLLocation) -> Bool {
-        return _shouldReRoute
+        return !isLastWaypoint
     }
+    
+    public func navigationViewController(_ navigationViewController: NavigationViewController, shouldPreventReroutesWhenArrivingAt waypoint: Waypoint) -> Bool {
+        return !isLastWaypoint
+    }
+    
 }
