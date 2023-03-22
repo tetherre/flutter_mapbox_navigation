@@ -37,5 +37,4 @@ class EmbeddedNavigationMapView(context: Context, activity: Activity, binding: N
         unregisterObservers();
         onDestroy();
     }
-
 }

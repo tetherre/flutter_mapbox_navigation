@@ -212,8 +212,8 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
                         ElevatedButton(
                           child: Text("Start "),
                           onPressed: _routeBuilt && !_isNavigating
-                              ? () {
-                                  _controller.startNavigation();
+                              ? () async {
+                                  await _controller.startNavigation();
                                 }
                               : null,
                         ),
@@ -312,6 +312,9 @@ class _SampleNavigationAppState extends State<SampleNavigationApp> {
         var progressEvent = e.data as RouteProgressEvent;
         if (progressEvent.currentStepInstruction != null)
           _instruction = progressEvent.currentStepInstruction;
+        setState(() {
+          _isNavigating = true;
+        });
         break;
       case MapBoxEvent.route_building:
       case MapBoxEvent.route_built:

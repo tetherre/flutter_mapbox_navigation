@@ -33,11 +33,7 @@ import com.mapbox.navigation.base.TimeFormat
 import com.mapbox.navigation.base.extensions.applyDefaultNavigationOptions
 import com.mapbox.navigation.base.extensions.applyLanguageAndVoiceUnitOptions
 import com.mapbox.navigation.base.options.NavigationOptions
-import com.mapbox.navigation.base.route.RouterCallback
-import com.mapbox.navigation.base.route.RouterFailure
-import com.mapbox.navigation.base.route.RouterOrigin
 import com.mapbox.navigation.core.MapboxNavigation
-import com.mapbox.navigation.core.MapboxNavigationProvider
 import com.mapbox.navigation.core.directions.session.RoutesObserver
 import com.mapbox.navigation.core.formatter.MapboxDistanceFormatter
 import com.mapbox.navigation.core.replay.MapboxReplayer
@@ -81,7 +77,14 @@ import eopeter.flutter_mapbox_navigation.R
 import eopeter.flutter_mapbox_navigation.databinding.NavigationActivityBinding
 import java.util.Locale
 import android.util.Log
+import androidx.lifecycle.*
+import com.mapbox.navigation.base.ExperimentalPreviewMapboxNavigationAPI
+import com.mapbox.navigation.base.formatter.DistanceFormatterOptions
+import com.mapbox.navigation.base.route.*
+import com.mapbox.navigation.core.lifecycle.MapboxNavigationApp
+import com.mapbox.navigation.core.lifecycle.MapboxNavigationObserver
 
+@OptIn(ExperimentalPreviewMapboxNavigationAPI::class)
 class NavigationActivity : AppCompatActivity() {
 
     var finishBroadcastReceiver: BroadcastReceiver? = null
@@ -134,40 +137,6 @@ class NavigationActivity : AppCompatActivity() {
         val p = intent.getSerializableExtra("waypoints") as? MutableList<Point>
         if (p != null) points = p
 
-        // initialize the location puck
-        binding.mapView.location.apply {
-            this.locationPuck = LocationPuck2D(
-                    bearingImage = ContextCompat.getDrawable(
-                            this@NavigationActivity,
-                            R.drawable.mapbox_navigation_puck_icon
-                    )
-            )
-            setLocationProvider(navigationLocationProvider)
-            enabled = true
-        }
-
-        // initialize Mapbox Navigation
-        mapboxNavigation = if (MapboxNavigationProvider.isCreated()) {
-            MapboxNavigationProvider.retrieve()
-        } else {
-            if (FlutterMapboxNavigationPlugin.simulateRoute) {
-                MapboxNavigationProvider.create(
-                        NavigationOptions.Builder(this.applicationContext)
-                                .accessToken(accessToken)
-                                // comment out the location engine setting block to disable simulation
-                                .locationEngine(replayLocationEngine)
-                                .build()
-                )
-            } else {
-                MapboxNavigationProvider.create(
-                        NavigationOptions.Builder(this.applicationContext)
-                                .accessToken(accessToken)
-                                .build()
-                )
-            }
-
-        }
-
         // initialize Navigation Camera
         viewportDataSource = MapboxNavigationViewportDataSource(mapboxMap)
         navigationCamera = NavigationCamera(
@@ -203,7 +172,7 @@ class NavigationActivity : AppCompatActivity() {
         }
 
         // make sure to use the same DistanceFormatterOptions across different features
-        val distanceFormatterOptions = mapboxNavigation.navigationOptions.distanceFormatterOptions
+        val distanceFormatterOptions = DistanceFormatterOptions.Builder(this).build()
 
         // initialize maneuver api that feeds the data to the top banner maneuver view
         maneuverApi = MapboxManeuverApi(
@@ -236,7 +205,7 @@ class NavigationActivity : AppCompatActivity() {
         )
         voiceInstructionsPlayer = MapboxVoiceInstructionsPlayer(
                 this,
-                accessToken!!,
+            accessToken!!,
                 Locale.US.language
         )
 
@@ -291,57 +260,82 @@ class NavigationActivity : AppCompatActivity() {
 
         // start the trip session to being receiving location updates in free drive
         // and later when a route is set also receiving route progress updates
+        // start the trip session to being receiving location updates in free drive
+        // and later when a route is set also receiving route progress updates
         mapboxNavigation.startTripSession()
-        findFirstRoute(points[0], points[1]);
+        findFirstRoute(points[0], points[1])
     }
 
     override fun onStart() {
         super.onStart()
-
-        // register event listeners
         mapboxNavigation.registerRoutesObserver(routesObserver)
-        mapboxNavigation.registerRouteProgressObserver(routeProgressObserver)
         mapboxNavigation.registerLocationObserver(locationObserver)
-        mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
+        mapboxNavigation.registerRouteProgressObserver(routeProgressObserver)
         mapboxNavigation.registerRouteProgressObserver(replayProgressObserver)
-        mapboxNavigation.setArrivalController(null);
+        mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
+        mapboxNavigation.setArrivalController(null)
 
-        if (mapboxNavigation.getNavigationRoutes().isEmpty()) {
-            // if simulation is enabled (ReplayLocationEngine set to NavigationOptions)
-            // but we're not simulating yet,
-            // push a single location sample to establish origin
-            mapboxReplayer.pushEvents(
-                    listOf(
-                            ReplayRouteMapper.mapToUpdateLocation(
-                                    eventTimestamp = 0.0,
-                                    point = Point.fromLngLat(-122.39726512303575, 37.785128345296805)
-                            )
-                    )
-            )
-            mapboxReplayer.playFirstLocation()
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-
-        // unregister event listeners to prevent leaks or unnecessary resource consumption
-        mapboxNavigation.unregisterRoutesObserver(routesObserver)
-        mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
-        mapboxNavigation.unregisterLocationObserver(locationObserver)
-        mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
-        mapboxNavigation.unregisterRouteProgressObserver(replayProgressObserver)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        MapboxNavigationProvider.destroy()
         mapboxReplayer.finish()
         maneuverApi.cancel()
         routeLineApi.cancel()
         routeLineView.cancel()
         speechApi.cancel()
         voiceInstructionsPlayer.shutdown()
+    }
+
+    private fun initNavigation() {
+        // initialize Mapbox Navigation
+        if (FlutterMapboxNavigationPlugin.simulateRoute) {
+            MapboxNavigationApp.setup(
+                NavigationOptions.Builder(this.applicationContext)
+                    .accessToken(accessToken)
+                    // comment out the location engine setting block to disable simulation
+                    .locationEngine(replayLocationEngine)
+                    .build()
+            )
+        } else {
+            MapboxNavigationApp.setup(
+                NavigationOptions.Builder(this.applicationContext)
+                    .accessToken(accessToken)
+                    .build()
+            )
+        }
+
+        // initialize the location puck
+        binding.mapView.location.apply {
+            this.locationPuck = LocationPuck2D(
+                bearingImage = ContextCompat.getDrawable(
+                    this@NavigationActivity,
+                    R.drawable.mapbox_navigation_puck_icon
+                )
+            )
+            setLocationProvider(navigationLocationProvider)
+            enabled = true
+        }
+
+        replayOriginLocation()
+    }
+
+    private fun replayOriginLocation() {
+        if (mapboxNavigation.getNavigationRoutes().isEmpty()) {
+            // if simulation is enabled (ReplayLocationEngine set to NavigationOptions)
+            // but we're not simulating yet,
+            // push a single location sample to establish origin
+            mapboxReplayer.pushEvents(
+                listOf(
+                    ReplayRouteMapper.mapToUpdateLocation(
+                        eventTimestamp = 0.0,
+                        point = Point.fromLngLat(-122.39726512303575, 37.785128345296805)
+                    )
+                )
+            )
+            mapboxReplayer.playFirstLocation()
+            mapboxReplayer.playbackSpeed(3.0)
+        }
     }
 
     private fun findRoute(destination: Point) {
@@ -375,23 +369,20 @@ class NavigationActivity : AppCompatActivity() {
                 .build();
         mapboxNavigation.requestRoutes(
                 routeOptions,
-                object : RouterCallback {
-                    override fun onRoutesReady(
-                            routes: List<DirectionsRoute>,
-                            routerOrigin: RouterOrigin
-                    ) {
-                        setRouteAndStartNavigation(routes)
-                    }
-
-                    override fun onFailure(
-                            reasons: List<RouterFailure>,
-                            routeOptions: RouteOptions
-                    ) {
-                        // no impl
-                    }
-
+                object : NavigationRouterCallback {
                     override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
                         // no impl
+                    }
+
+                    override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
+                        // no impl
+                    }
+
+                    override fun onRoutesReady(
+                        routes: List<NavigationRoute>,
+                        routerOrigin: RouterOrigin
+                    ) {
+                        setRouteAndStartNavigation(routes)
                     }
                 }
         )
@@ -422,23 +413,20 @@ class NavigationActivity : AppCompatActivity() {
                 )
                 .layersList(listOf(mapboxNavigation.getZLevel(), null))
                         .build(),
-                object : RouterCallback {
-                    override fun onRoutesReady(
-                            routes: List<DirectionsRoute>,
-                            routerOrigin: RouterOrigin
-                    ) {
-                        setRouteAndStartNavigation(routes)
-                    }
-
-                    override fun onFailure(
-                            reasons: List<RouterFailure>,
-                            routeOptions: RouteOptions
-                    ) {
+                object : NavigationRouterCallback {
+                    override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
                         // no impl
                     }
 
-                    override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
+                    override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
+                        // no impl
+                    }
 
+                    override fun onRoutesReady(
+                        routes: List<NavigationRoute>,
+                        routerOrigin: RouterOrigin
+                    ) {
+                        setRouteAndStartNavigation(routes)
                     }
                 }
         )
@@ -479,50 +467,47 @@ class NavigationActivity : AppCompatActivity() {
                         .waypointIndicesList(addedWaypoints.waypointsIndices())
                         .waypointNamesList(addedWaypoints.waypointsNames())
                         .build(),
-                object : RouterCallback {
-                    override fun onRoutesReady(
-                            routes: List<DirectionsRoute>,
-                            routerOrigin: RouterOrigin
-                    ) {
-                        setRoute(routes)
-                    }
-
-                    override fun onFailure(
-                            reasons: List<RouterFailure>,
-                            routeOptions: RouteOptions
-                    ) {
-                        // no impl
-                    }
-
+                object : NavigationRouterCallback {
                     override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
                         // no impl
+                    }
+
+                    override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
+                        // no impl
+                    }
+
+                    override fun onRoutesReady(
+                        routes: List<NavigationRoute>,
+                        routerOrigin: RouterOrigin
+                    ) {
+                        setRoute(routes)
                     }
                 }
         )
     }
 
-    private fun setRoute(routes: List<DirectionsRoute>) {
+    private fun setRoute(routes: List<NavigationRoute>) {
         // set routes, where the first route in the list is the primary route that
         // will be used for active guidance
-        mapboxNavigation.setRoutes(routes)
+        mapboxNavigation.setNavigationRoutes(routes)
         // show the "Reset the route" button
         canResetRoute = true
     }
 
     // Resets the current route
     private fun resetCurrentRoute() {
-        if (mapboxNavigation.getRoutes().isNotEmpty()) {
-            mapboxNavigation.setRoutes(emptyList()) // reset route
+        if (mapboxNavigation.getNavigationRoutes().isNotEmpty()) {
+            mapboxNavigation.setNavigationRoutes(emptyList()) // reset route
             addedWaypoints.clear() // reset stored waypoints
         }
     }
 
-    private fun setRouteAndStartNavigation(routes: List<DirectionsRoute>) {
+    private fun setRouteAndStartNavigation(routes: List<NavigationRoute>) {
         // set routes, where the first route in the list is the primary route that
         // will be used for active guidance
         val index = intent.getSerializableExtra("routeIndex") as? Int
         routeIndex = index ?: 0
-        mapboxNavigation.setRoutes(listOf(routes[routeIndex]))
+        mapboxNavigation.setNavigationRoutes(listOf(routes[routeIndex]))
 
         // start location simulation along the primary route
         startSimulation(routes.first())
@@ -538,7 +523,7 @@ class NavigationActivity : AppCompatActivity() {
 
     private fun clearRouteAndStopNavigation() {
         // clear
-        mapboxNavigation.setRoutes(listOf())
+        mapboxNavigation.setNavigationRoutes(listOf())
 
         // stop simulation
         mapboxReplayer.stop()
@@ -552,11 +537,11 @@ class NavigationActivity : AppCompatActivity() {
         finish();
     }
 
-    private fun startSimulation(route: DirectionsRoute) {
+    private fun startSimulation(route: NavigationRoute) {
         mapboxReplayer.run {
             stop()
             clearEvents()
-            val replayEvents = ReplayRouteMapper().mapDirectionsRouteGeometry(route)
+            val replayEvents = ReplayRouteMapper().mapDirectionsRouteGeometry(route.directionsRoute)
             pushEvents(replayEvents)
             seekTo(replayEvents.first())
             play()
@@ -599,11 +584,33 @@ class NavigationActivity : AppCompatActivity() {
      */
     private lateinit var mapboxMap: MapboxMap
 
-    /**
-     * Mapbox Navigation entry point. There should only be one instance of this object for the app.
-     * You can use [MapboxNavigationProvider] to help create and obtain that instance.
-     */
-    private lateinit var mapboxNavigation: MapboxNavigation
+    private lateinit var mapboxNavigation : MapboxNavigation
+    /*private val mapboxNavigation: MapboxNavigation by requireMapboxNavigation(
+        onResumedObserver = object : MapboxNavigationObserver {
+            @SuppressLint("MissingPermission")
+            override fun onAttached(mapboxNavigation: MapboxNavigation) {
+                mapboxNavigation.registerRoutesObserver(routesObserver)
+                mapboxNavigation.registerLocationObserver(locationObserver)
+                mapboxNavigation.registerRouteProgressObserver(routeProgressObserver)
+                mapboxNavigation.registerRouteProgressObserver(replayProgressObserver)
+                mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
+                mapboxNavigation.setArrivalController(null)
+                // start the trip session to being receiving location updates in free drive
+                // and later when a route is set also receiving route progress updates
+                mapboxNavigation.startTripSession()
+                findFirstRoute(points[0], points[1])
+            }
+
+            override fun onDetached(mapboxNavigation: MapboxNavigation) {
+                mapboxNavigation.unregisterRoutesObserver(routesObserver)
+                mapboxNavigation.unregisterLocationObserver(locationObserver)
+                mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
+                mapboxNavigation.unregisterRouteProgressObserver(replayProgressObserver)
+                mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
+            }
+        },
+        onInitialize = this::initNavigation
+    )*/
 
     /**
      * Used to execute camera transitions based on the data generated by the [viewportDataSource].
@@ -769,7 +776,7 @@ class NavigationActivity : AppCompatActivity() {
 
         override fun onNewRawLocation(rawLocation: Location) {
             // not handled
-            Log.d("onNewRawLocation - Navigation", rawLocation.toString());
+            Log.d("onNewRawLocation", rawLocation.toString());
         }
 
         override fun onNewLocationMatcherResult(locationMatcherResult: LocationMatcherResult) {
@@ -848,12 +855,12 @@ class NavigationActivity : AppCompatActivity() {
 
         speechApi.cancel();
         voiceInstructionsPlayer.clear();
-        if (routeUpdateResult.routes.isNotEmpty()) {
+        if (routeUpdateResult.navigationRoutes.isNotEmpty()) {
 
             // generate route geometries asynchronously and render them
-            val routeLines = routeUpdateResult.routes.map { RouteLine(it, null) }
+            val routeLines = routeUpdateResult.navigationRoutes
 
-            routeLineApi.setRoutes(
+            routeLineApi.setNavigationRoutes(
                     routeLines
             ) { value ->
                 mapboxMap.getStyle()?.apply {
@@ -862,7 +869,7 @@ class NavigationActivity : AppCompatActivity() {
             }
 
             // update the camera position to account for the new route
-            viewportDataSource.onRouteChanged(routeUpdateResult.routes.first())
+            viewportDataSource.onRouteChanged(routeUpdateResult.navigationRoutes.first())
             viewportDataSource.evaluate()
         } else {
             // remove the route line and route arrow from the map

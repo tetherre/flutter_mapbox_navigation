@@ -5,14 +5,14 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.annotation.NonNull;
+import android.util.Log
+import androidx.annotation.NonNull
+import androidx.lifecycle.Lifecycle
 import com.eopeter.flutter_mapbox_navigation.activity.NavigationLauncher
 import com.eopeter.flutter_mapbox_navigation.factory.EmbeddedNavigationViewFactory
-
 import com.mapbox.api.directions.v5.DirectionsCriteria
 import com.mapbox.api.directions.v5.models.DirectionsRoute
 import com.mapbox.geojson.Point
-
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -24,7 +24,6 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.plugin.platform.PlatformViewRegistry
 import java.util.*
-import android.util.Log
 
 /** FlutterMapboxNavigationPlugin */
 public class FlutterMapboxNavigationPlugin: FlutterPlugin, MethodCallHandler, EventChannel.StreamHandler, ActivityAware {
@@ -289,4 +288,4 @@ public class FlutterMapboxNavigationPlugin: FlutterPlugin, MethodCallHandler, Ev
 
 }
 
-private const val MAPBOX_ACCESS_TOKEN_PLACEHOLDER = "YOUR_MAPBOX_ACCESS_TOKEN_GOES_HERE"
+private const val MAPBOX_ACCESS_TOKEN_PLACEHOLDER = "pk.eyJ1Ijoic2NvdHRtYXJ0aW41NjI2IiwiYSI6ImNsNm54Y2dhajAxcmczY29hMWlzeWwwMmEifQ.ZcBB5Hr5txGq2P8EjR0g_Q"

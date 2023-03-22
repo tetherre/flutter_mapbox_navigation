@@ -79,7 +79,10 @@ class MapBoxNavigationViewController {
     _routeEventSubscription = _streamRouteEvent!.listen(_onProgressData);
     return await _methodChannel
         .invokeMethod('buildRoute', args)
-        .then<bool>((dynamic result) => result);
+        .then<bool>((dynamic result) {
+      print("MAPBOX PACKAGE - BUILD ROUTE NAVIGATION: $result");
+      return result;
+    });
   }
 
   /// starts listening for events
@@ -89,7 +92,12 @@ class MapBoxNavigationViewController {
 
   /// Clear the built route and resets the map
   Future<bool?> clearRoute() async {
-    return _methodChannel.invokeMethod('clearRoute', null);
+    return await _methodChannel
+        .invokeMethod('clearRoute', null)
+        .then<bool>((dynamic result) {
+      print("MAPBOX PACKAGE - Clear ROUTE NAVIGATION: $result");
+      return result;
+    });
   }
 
   /// Starts the Navigation
@@ -97,7 +105,14 @@ class MapBoxNavigationViewController {
     Map<String, dynamic>? args;
     if (options != null) args = options.toMap();
     //_routeEventSubscription = _streamRouteEvent.listen(_onProgressData);
-    return _methodChannel.invokeMethod('startNavigation', args);
+    return await _methodChannel
+        .invokeMethod('startNavigation', args)
+        .then<bool>(
+      (dynamic value) {
+        print("MAPBOX PACKAGE - START NAVIGATION: $value");
+        return value;
+      },
+    );
   }
 
   ///Ends Navigation and Closes the Navigation View
@@ -118,7 +133,9 @@ class MapBoxNavigationViewController {
   void _onProgressData(RouteEvent event) {
     if (_routeEventNotifier != null) _routeEventNotifier!(event);
 
-    if (event.eventType == MapBoxEvent.on_arrival)
+    if (event.eventType == MapBoxEvent.on_arrival ||
+        event.eventType == MapBoxEvent.navigation_finished ||
+        event.eventType == MapBoxEvent.navigation_cancelled)
       _routeEventSubscription.cancel();
   }
 
@@ -140,6 +157,7 @@ class MapBoxNavigationViewController {
           eventType: MapBoxEvent.progress_change, data: progressEvent);
     } else
       event = RouteEvent.fromJson(map);
+    print("MAPBOX EVENT: ${event.eventType}");
     return event;
   }
 }

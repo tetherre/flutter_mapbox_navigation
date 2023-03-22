@@ -154,14 +154,16 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
     {
         if routeResponse == nil
         {
+            result(false)
             return
         }
-
+        
         setupMapView()
         self.view().setNeedsDisplay()
 
         routeResponse = nil
         sendEvent(eventType: MapBoxEventType.navigation_cancelled)
+        result(true)
     }
 
     func buildRoute(arguments: NSDictionary?, flutterResult: @escaping FlutterResult)
@@ -170,7 +172,7 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
         sendEvent(eventType: MapBoxEventType.route_building)
 
         guard let oWayPoints = arguments?["wayPoints"] as? NSDictionary else {return}
-
+        
         var locations = [Location]()
 
         for item in oWayPoints as NSDictionary
@@ -254,16 +256,16 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
 
     func startEmbeddedNavigation(arguments: NSDictionary?, result: @escaping FlutterResult) {
-        guard let response = self.routeResponse else { return }
+        guard let response = self.routeResponse else { result(false); return }
         let navLocationManager = self._simulateRoute ? SimulatedLocationManager(route: response.routes!.first!) : NavigationLocationManager()
-        navigationService = MapboxNavigationService(routeResponse: response,
-                                                            routeIndex: selectedRouteIndex,
-                                                            routeOptions: routeOptions!,
-                                                            routingProvider: MapboxRoutingProvider(.hybrid),
+        
+        navigationService = MapboxNavigationService(indexedRouteResponse: IndexedRouteResponse(routeResponse: response, routeIndex: selectedRouteIndex),
+                                                    customRoutingProvider: MapboxRoutingProvider(.hybrid),
                                                             credentials: NavigationSettings.shared.directions.credentials,
                                                             locationSource: navLocationManager,
                                                     simulating: self._simulateRoute ? .always : .onPoorGPS)
-        navigationService.delegate = self
+        
+        //navigationService.delegate = self
         
         var dayStyle = CustomDayStyle()
         if(_mapStyleUrlDay != nil){
@@ -274,22 +276,27 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
             nightStyle.mapStyleURL = URL(string: _mapStyleUrlNight!)!
         }
         let navigationOptions = NavigationOptions(styles: [dayStyle, nightStyle], navigationService: navigationService)
-
+        
+        let x = navigationOptions.bottomBanner as? BottomBannerViewController;
+        x?.delegate = self
+        
         // Remove previous navigation view and controller if any
         if(_navigationViewController?.view != nil){
             _navigationViewController!.view.removeFromSuperview()
             _navigationViewController?.removeFromParent()
         }
 
-        _navigationViewController = NavigationViewController(for: response, routeIndex: selectedRouteIndex, routeOptions: routeOptions!, navigationOptions: navigationOptions)
+        _navigationViewController = NavigationViewController(for: IndexedRouteResponse(routeResponse: response, routeIndex: selectedRouteIndex), navigationOptions: navigationOptions)
         _navigationViewController!.delegate = self
+        _navigationViewController!.showsEndOfRouteFeedback = false;
 
         let flutterViewController = UIApplication.shared.delegate?.window?!.rootViewController as! FlutterViewController
+        
         flutterViewController.addChild(_navigationViewController!)
-
         self.navigationMapView.addSubview(_navigationViewController!.view)
 
         _navigationViewController!.view.translatesAutoresizingMaskIntoConstraints = false
+        
 
         constraintsWithPaddingBetween(holderView: self.navigationMapView, topView: _navigationViewController!.view, padding: 0.0)
         flutterViewController.didMove(toParent: flutterViewController)
@@ -326,11 +333,11 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
     
     func moveCameraToCenter()
     {
-        var duration = 5.0
-        if(!_animateBuildRoute)
-        {
-            duration = 0.0
-        }
+        //var duration = 5.0
+        //if(!_animateBuildRoute)
+        //{
+            //duration = 0.0
+        //}
         
         let navigationViewportDataSource = NavigationViewportDataSource(navigationMapView.mapView, viewportDataSourceType: .raw)
         navigationViewportDataSource.options.followingCameraOptions.zoomUpdatesAllowed = false
@@ -351,31 +358,31 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
 }
 
-extension FlutterMapboxNavigationView : NavigationServiceDelegate {
-    
-    public func navigationService(_ service: NavigationService, didUpdate progress: RouteProgress, with location: CLLocation, rawLocation: CLLocation) {
-        _lastKnownLocation = location
-        _distanceRemaining = progress.distanceRemaining
-        _durationRemaining = progress.durationRemaining
-        sendEvent(eventType: MapBoxEventType.navigation_running)
-        //_currentLegDescription =  progress.currentLeg.description
-        if(_eventSink != nil)
-        {
-            let jsonEncoder = JSONEncoder()
-
-            let progressEvent = MapBoxRouteProgressEvent(progress: progress)
-            let progressEventJsonData = try! jsonEncoder.encode(progressEvent)
-            let progressEventJson = String(data: progressEventJsonData, encoding: String.Encoding.ascii)
-
-            _eventSink!(progressEventJson)
-
-            if(progress.isFinalLeg && progress.currentLegProgress.userHasArrivedAtWaypoint)
-            {
-                _eventSink = nil
-            }
-        }
-    }
-}
+//extension FlutterMapboxNavigationView : NavigationServiceDelegate {
+//
+//    public func navigationService(_ service: NavigationService, didUpdate progress: RouteProgress, with location: CLLocation, rawLocation: CLLocation) {
+//        _lastKnownLocation = location
+//        _distanceRemaining = progress.distanceRemaining
+//        _durationRemaining = progress.durationRemaining
+//        sendEvent(eventType: MapBoxEventType.navigation_runnirunning)
+//        //_currentLegDescription =  progress.currentLeg.description
+//        if(_eventSink != nil)
+//        {
+//            let jsonEncoder = JSONEncoder()
+//
+//            let progressEvent = MapBoxRouteProgressEvent(progress: progress)
+//            let progressEventJsonData = try! jsonEncoder.encode(progressEvent)
+//            let progressEventJson = String(data: progressEventJsonData, encoding: String.Encoding.ascii)
+//
+//            _eventSink!(progressEventJson)
+//
+//            if(progress.isFinalLeg && progress.currentLegProgress.userHasArrivedAtWaypoint)
+//            {
+//                _eventSink = nil
+//            }
+//        }
+//    }
+//}
 
 extension FlutterMapboxNavigationView : NavigationMapViewDelegate {
     
@@ -393,6 +400,12 @@ extension FlutterMapboxNavigationView : NavigationMapViewDelegate {
         moveCameraToCenter()
     }
     
+}
+
+extension FlutterMapboxNavigationView : BottomBannerViewControllerDelegate {
+    public func didTapCancel(_ sender: Any) {
+        sendEvent(eventType: MapBoxEventType.navigation_cancelled)
+    }
 }
 
 extension FlutterMapboxNavigationView : UIGestureRecognizerDelegate {
