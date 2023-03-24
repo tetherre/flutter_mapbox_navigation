@@ -10,22 +10,21 @@ import android.content.res.Configuration
 import android.content.res.Resources
 import android.location.Location
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.doOnAttach
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.*
 import eopeter.flutter_mapbox_navigation.databinding.NavigationActivityBinding
 import eopeter.flutter_mapbox_navigation.R
 import com.eopeter.flutter_mapbox_navigation.models.MapBoxEvents
 import com.eopeter.flutter_mapbox_navigation.models.MapBoxRouteProgressEvent
 import com.eopeter.flutter_mapbox_navigation.utilities.PluginUtilities
 import com.mapbox.api.directions.v5.DirectionsCriteria
+import com.mapbox.api.directions.v5.models.Bearing
 import com.mapbox.api.directions.v5.models.DirectionsRoute
 import com.mapbox.api.directions.v5.models.RouteOptions
 
@@ -49,6 +48,7 @@ import com.mapbox.navigation.core.directions.session.RoutesObserver
 import com.mapbox.navigation.core.formatter.MapboxDistanceFormatter
 import com.mapbox.navigation.core.lifecycle.MapboxNavigationApp
 import com.mapbox.navigation.core.lifecycle.MapboxNavigationObserver
+import com.mapbox.navigation.core.lifecycle.requireMapboxNavigation
 import com.mapbox.navigation.core.replay.MapboxReplayer
 import com.mapbox.navigation.core.replay.ReplayLocationEngine
 import com.mapbox.navigation.core.replay.route.ReplayProgressObserver
@@ -91,27 +91,50 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.*
 
-@OptIn(ExperimentalPreviewMapboxNavigationAPI::class)
 open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBinding, accessToken: String):  MethodChannel.MethodCallHandler, EventChannel.StreamHandler,
-    Application.ActivityLifecycleCallbacks {
+    Application.ActivityLifecycleCallbacks, LifecycleOwner {
+
+    private var lifecycleRegistry: LifecycleRegistry = LifecycleRegistry(this)
 
     open fun initFlutterChannelHandlers() {
         methodChannel?.setMethodCallHandler(this)
         eventChannel?.setStreamHandler(this)
     }
 
+    @SuppressLint("MissingPermission")
     open fun initNavigation() {
         // initialize Mapbox Navigation
+        lifecycleRegistry.currentState = Lifecycle.State.CREATED
+
         if (!MapboxNavigationApp.isSetup()) {
             MapboxNavigationApp.setup(
                 NavigationOptions.Builder(this.context)
                     .accessToken(token)
                     // comment out the location engine setting block to disable simulation
-                    .locationEngine(replayLocationEngine)
+                    //.locationEngine(replayLocationEngine)
                     .build()
-            )
+            ).attach(this)
         }
 
+        // initialize navigation trip observers
+        registerObservers()
+
+        binding.mapView.location.apply {
+            setLocationProvider(navigationLocationProvider)
+
+            // Uncomment this block of code if you want to see a circular puck with arrow.
+            locationPuck = LocationPuck2D(
+                bearingImage = ContextCompat.getDrawable(
+                    context,
+                    R.drawable.mapbox_navigation_puck_icon
+                )
+            )
+            // When true, the blue circular puck is shown on the map. If set to false, user
+            // location in the form of puck will not be shown on the map.
+            enabled = true
+        }
+
+        ViewTreeLifecycleOwner.set(binding.mapView, this);
         mapboxMap = binding.mapView.getMapboxMap()
 
         // initialize Navigation Camera
@@ -149,7 +172,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         }
 
         // make sure to use the same DistanceFormatterOptions across different features
-        val distanceFormatterOptions = DistanceFormatterOptions.Builder(context).build()
+        val distanceFormatterOptions = DistanceFormatterOptions.Builder(activity).build()
 
         // initialize maneuver api that feeds the data to the top banner maneuver view
         maneuverApi = MapboxManeuverApi(
@@ -182,7 +205,6 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         )
         voiceInstructionsPlayer = MapboxVoiceInstructionsPlayer(
             activity,
-            token,
             Locale.US.language
         )
 
@@ -212,9 +234,13 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         }
 
         // initialize view interactions
+        binding.stop.bringToFront()
+        binding.stop.isFocusable = true
         binding.stop.setOnClickListener {
             ////clearRouteAndStopNavigation()
+            finishNavigation()
         }
+
         binding.recenter.setOnClickListener {
             navigationCamera.requestNavigationCameraToFollowing()
             binding.routeOverview.showTextAndExtend(BUTTON_ANIMATION_DURATION)
@@ -230,26 +256,6 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
 
         // set initial sounds button state
         binding.soundButton.unmute()
-
-        binding.mapView.location.apply {
-            setLocationProvider(navigationLocationProvider)
-
-            // Uncomment this block of code if you want to see a circular puck with arrow.
-            locationPuck = LocationPuck2D(
-                bearingImage = ContextCompat.getDrawable(
-                    context,
-                    R.drawable.mapbox_navigation_puck_icon
-                )
-            )
-            // When true, the blue circular puck is shown on the map. If set to false, user
-            // location in the form of puck will not be shown on the map.
-            enabled = true
-        }
-
-        // initialize navigation trip observers
-        registerObservers()
-
-
     }
 
     override fun onMethodCall(methodCall: MethodCall, result: MethodChannel.Result) {
@@ -310,7 +316,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
 
     private fun getRoute(context: Context) {
 
-//        val originLocation = navigationLocationProvider.lastLocation
+        val originLocation = navigationLocationProvider.lastLocation
 //        val originPoint = originLocation?.let {
 //            Point.fromLngLat(it.longitude, it.latitude)
 //        } ?: return
@@ -321,34 +327,28 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         }
 
         PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILDING)
-
-        MapboxNavigationApp.current()?.requestRoutes(
+        Log.d("NAVIGATIONMODE", navigationMode)
+        mapboxNavigation.requestRoutes(
             RouteOptions.builder()
-                .applyDefaultNavigationOptions()
+                .applyDefaultNavigationOptions(navigationMode)
                 .applyLanguageAndVoiceUnitOptions(context)
                 .coordinatesList(wayPoints)
                 .language(navigationLanguage)
                 .alternatives(alternatives)
-                .profile(navigationMode)
                 .continueStraight(!allowsUTurnAtWayPoints)
                 .voiceUnits(navigationVoiceUnits)
-                .annotations(DirectionsCriteria.ANNOTATION_DISTANCE)
                 .baseUrl("https://api.mapbox.com")
-                .user(UUID.randomUUID().toString())
-                // provide the bearing for the origin of the request to ensure
-                // that the returned route faces in the direction of the current user movement
-                /*
-                .bearingsList(
+
+                /*.bearingsList(
                     listOf(
                         Bearing.builder()
-                            .angle(originLocation.bearing.toDouble())
+                            //.angle(originLocation.bearing.toDouble())
+                            .angle(-60.0)
                             .degrees(45.0)
                             .build(),
                         null
                     )
-                )
-                 */
-                .layersList(listOf(MapboxNavigationApp.current()?.getZLevel(), null))
+                )*/
                 .build()
             , object : NavigationRouterCallback {
 
@@ -363,9 +363,9 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
                     currentRoute = routes[0]
                     PluginUtilities.sendEvent(MapBoxEvents.ROUTE_BUILT)
                     // Draw the route on the map
-                    MapboxNavigationApp.current()?.setNavigationRoutes(routes)
+                    mapboxNavigation.setNavigationRoutes(routes)
                     // move the camera to overview when new route is available
-                    navigationCamera.requestNavigationCameraToOverview()
+                    navigationCamera.requestNavigationCameraToFollowing()
 
                     isBuildingRoute = false
 
@@ -403,7 +403,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
     }
 
     private fun clearRoute(methodCall: MethodCall, result: MethodChannel.Result) {
-        MapboxNavigationApp.current()?.setNavigationRoutes(listOf())
+        mapboxNavigation.setNavigationRoutes(listOf())
         // stop simulation
         mapboxReplayer.stop()
 
@@ -450,7 +450,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
             if (simulateRoute) {
                 mapboxReplayer.play()
             }
-            MapboxNavigationApp.current()?.startTripSession()
+            mapboxNavigation.startTripSession()
             // show UI elements
             binding.soundButton.visibility = View.VISIBLE
             binding.routeOverview.visibility = View.VISIBLE
@@ -466,7 +466,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
     private fun finishNavigation(isOffRouted: Boolean = false) {
 
         // clear
-        MapboxNavigationApp.current()?.setNavigationRoutes(listOf())
+        mapboxNavigation.setNavigationRoutes(listOf())
 
         zoom = 15.0
         bearing = 0.0
@@ -481,14 +481,14 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         if(simulateRoute)
             mapboxReplayer.stop()
 
-        MapboxNavigationApp.current()?.stopTripSession()
+        mapboxNavigation.stopTripSession()
 
         // hide UI elements
         binding.soundButton.visibility = View.INVISIBLE
         binding.maneuverView.visibility = View.INVISIBLE
         binding.routeOverview.visibility = View.INVISIBLE
         binding.tripProgressCard.visibility = View.INVISIBLE
-
+        PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
     }
 
     private fun updateCamera(location: Location) {
@@ -583,20 +583,22 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
 
     open fun registerObservers() {
         // register event listeners
-        MapboxNavigationApp.current()?.registerRoutesObserver(routesObserver)
-        MapboxNavigationApp.current()?.registerRouteProgressObserver(routeProgressObserver)
-        MapboxNavigationApp.current()?.registerLocationObserver(locationObserver)
-        MapboxNavigationApp.current()?.registerVoiceInstructionsObserver(voiceInstructionsObserver)
-        MapboxNavigationApp.current()?.registerRouteProgressObserver(replayProgressObserver)
+        val mapboxNav = mapboxNavigation
+        mapboxNav.registerRoutesObserver(routesObserver)
+        mapboxNav.registerRouteProgressObserver(routeProgressObserver)
+        mapboxNav.registerLocationObserver(locationObserver)
+        mapboxNav.registerVoiceInstructionsObserver(voiceInstructionsObserver)
+        mapboxNav.registerRouteProgressObserver(replayProgressObserver)
     }
 
     open fun unregisterObservers() {
         // unregister event listeners to prevent leaks or unnecessary resource consumption
-        MapboxNavigationApp.current()?.unregisterRoutesObserver(routesObserver)
-        MapboxNavigationApp.current()?.unregisterRouteProgressObserver(routeProgressObserver)
-        MapboxNavigationApp.current()?.unregisterLocationObserver(locationObserver)
-        MapboxNavigationApp.current()?.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
-        MapboxNavigationApp.current()?.unregisterRouteProgressObserver(replayProgressObserver)
+        val mapboxNav = mapboxNavigation
+        mapboxNav.unregisterRoutesObserver(routesObserver)
+        mapboxNav.unregisterRouteProgressObserver(routeProgressObserver)
+        mapboxNav.unregisterLocationObserver(locationObserver)
+        mapboxNav.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
+        mapboxNav.unregisterRouteProgressObserver(replayProgressObserver)
     }
 
     fun onDestroy() {
@@ -606,6 +608,8 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         routeLineView.cancel()
         speechApi.cancel()
         voiceInstructionsPlayer.shutdown()
+
+        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
     }
 
     //Flutter stream listener delegate methods
@@ -687,6 +691,33 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
      * You need to get a new reference to this object whenever the [MapView] is recreated.
      */
     private lateinit var mapboxMap: MapboxMap
+
+    private val mapboxNavigation: MapboxNavigation by requireMapboxNavigation(
+        onResumedObserver = object : MapboxNavigationObserver {
+            @SuppressLint("MissingPermission")
+            override fun onAttached(mapboxNavigation: MapboxNavigation) {
+                mapboxNavigation.registerRoutesObserver(routesObserver)
+                mapboxNavigation.registerLocationObserver(locationObserver)
+                mapboxNavigation.registerRouteProgressObserver(routeProgressObserver)
+                mapboxNavigation.registerRouteProgressObserver(replayProgressObserver)
+                mapboxNavigation.registerVoiceInstructionsObserver(voiceInstructionsObserver)
+                mapboxNavigation.setArrivalController(null)
+                // start the trip session to being receiving location updates in free drive
+                // and later when a route is set also receiving route progress updates
+                mapboxNavigation.startTripSession()
+                //findFirstRoute(points[0], points[1])
+            }
+
+            override fun onDetached(mapboxNavigation: MapboxNavigation) {
+                mapboxNavigation.unregisterRoutesObserver(routesObserver)
+                mapboxNavigation.unregisterLocationObserver(locationObserver)
+                mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
+                mapboxNavigation.unregisterRouteProgressObserver(replayProgressObserver)
+                mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
+            }
+        },
+        //onInitialize = this::initNavigation
+    )
 
     /**
      * Used to execute camera transitions based on the data generated by the [viewportDataSource].
@@ -852,6 +883,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
 
         override fun onNewRawLocation(rawLocation: Location) {
             // not handled
+            Log.d("onNewRawLocation", rawLocation.toString());
         }
 
         override fun onNewLocationMatcherResult(locationMatcherResult: LocationMatcherResult) {
@@ -940,6 +972,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
      * - driver got off route and a reroute was executed
      */
     private val routesObserver = RoutesObserver { routeUpdateResult ->
+
         if (routeUpdateResult.navigationRoutes.isNotEmpty()) {
             // generate route geometries asynchronously and render them
             val routeLines = routeUpdateResult.navigationRoutes
@@ -980,11 +1013,11 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
         //lifecycleRegistry = LifecycleRegistry(this)
-        //lifecycleRegistry.currentState = Lifecycle.State.CREATED
+        lifecycleRegistry.currentState = Lifecycle.State.CREATED
     }
 
     override fun onActivityStarted(activity: Activity) {
-        //lifecycleRegistry.currentState = Lifecycle.State.STARTED
+        lifecycleRegistry.currentState = Lifecycle.State.STARTED
     }
 
     override fun onActivityResumed(activity: Activity) {
@@ -1005,5 +1038,9 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
 
     override fun onActivityDestroyed(activity: Activity) {
         TODO("Not yet implemented")
+    }
+
+    override fun getLifecycle(): Lifecycle {
+        return lifecycleRegistry
     }
 }

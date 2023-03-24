@@ -288,4 +288,4 @@ public class FlutterMapboxNavigationPlugin: FlutterPlugin, MethodCallHandler, Ev
 
 }
 
-private const val MAPBOX_ACCESS_TOKEN_PLACEHOLDER = "pk.eyJ1Ijoic2NvdHRtYXJ0aW41NjI2IiwiYSI6ImNsNm54Y2dhajAxcmczY29hMWlzeWwwMmEifQ.ZcBB5Hr5txGq2P8EjR0g_Q"
+private const val MAPBOX_ACCESS_TOKEN_PLACEHOLDER = "TOKEN"
