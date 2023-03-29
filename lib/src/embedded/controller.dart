@@ -87,7 +87,7 @@ class MapBoxNavigationViewController {
 
   /// starts listening for events
   Future<void> initialize() async {
-    _routeEventSubscription = _streamRouteEvent!.listen(_onProgressData);
+    //_routeEventSubscription = _streamRouteEvent!.listen(_onProgressData);
   }
 
   /// Clear the built route and resets the map
@@ -104,7 +104,7 @@ class MapBoxNavigationViewController {
   Future<bool?> startNavigation({MapBoxOptions? options}) async {
     Map<String, dynamic>? args;
     if (options != null) args = options.toMap();
-    //_routeEventSubscription = _streamRouteEvent.listen(_onProgressData);
+    //_routeEventSubscription = _streamRouteEvent!.listen(_onProgressData);
     return await _methodChannel
         .invokeMethod('startNavigation', args)
         .then<bool>(
@@ -133,10 +133,10 @@ class MapBoxNavigationViewController {
   void _onProgressData(RouteEvent event) {
     if (_routeEventNotifier != null) _routeEventNotifier!(event);
 
-    if (event.eventType == MapBoxEvent.on_arrival ||
-        event.eventType == MapBoxEvent.navigation_finished ||
-        event.eventType == MapBoxEvent.navigation_cancelled)
+    if (event.eventType == MapBoxEvent.navigation_finished)
       _routeEventSubscription.cancel();
+
+    print("ONPROGRESS DATA ${event.eventType}");
   }
 
   Stream<RouteEvent>? get _streamRouteEvent {

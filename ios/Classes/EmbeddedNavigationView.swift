@@ -265,11 +265,12 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
                                                             locationSource: navLocationManager,
                                                     simulating: self._simulateRoute ? .always : .onPoorGPS)
         
-        //navigationService.delegate = self
+        navigationService.delegate = self
         
         var dayStyle = CustomDayStyle()
         if(_mapStyleUrlDay != nil){
             dayStyle = CustomDayStyle(url: _mapStyleUrlDay)
+            
         }
         let nightStyle = CustomNightStyle()
         if(_mapStyleUrlNight != nil){
@@ -277,8 +278,8 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
         }
         let navigationOptions = NavigationOptions(styles: [dayStyle, nightStyle], navigationService: navigationService)
         
-        let x = navigationOptions.bottomBanner as? BottomBannerViewController;
-        x?.delegate = self
+        let bottomBannerViewController = navigationOptions.bottomBanner as? BottomBannerViewController;
+        bottomBannerViewController?.delegate = self
         
         // Remove previous navigation view and controller if any
         if(_navigationViewController?.view != nil){
@@ -358,31 +359,31 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
 }
 
-//extension FlutterMapboxNavigationView : NavigationServiceDelegate {
-//
-//    public func navigationService(_ service: NavigationService, didUpdate progress: RouteProgress, with location: CLLocation, rawLocation: CLLocation) {
-//        _lastKnownLocation = location
-//        _distanceRemaining = progress.distanceRemaining
-//        _durationRemaining = progress.durationRemaining
-//        sendEvent(eventType: MapBoxEventType.navigation_runnirunning)
-//        //_currentLegDescription =  progress.currentLeg.description
-//        if(_eventSink != nil)
-//        {
-//            let jsonEncoder = JSONEncoder()
-//
-//            let progressEvent = MapBoxRouteProgressEvent(progress: progress)
-//            let progressEventJsonData = try! jsonEncoder.encode(progressEvent)
-//            let progressEventJson = String(data: progressEventJsonData, encoding: String.Encoding.ascii)
-//
-//            _eventSink!(progressEventJson)
-//
-//            if(progress.isFinalLeg && progress.currentLegProgress.userHasArrivedAtWaypoint)
-//            {
-//                _eventSink = nil
-//            }
-//        }
-//    }
-//}
+extension FlutterMapboxNavigationView : NavigationServiceDelegate {
+
+    public func navigationService(_ service: NavigationService, didUpdate progress: RouteProgress, with location: CLLocation, rawLocation: CLLocation) {
+        _lastKnownLocation = location
+        _distanceRemaining = progress.distanceRemaining
+        _durationRemaining = progress.durationRemaining
+        sendEvent(eventType: MapBoxEventType.navigation_running)
+        //_currentLegDescription =  progress.currentLeg.description
+        if(_eventSink != nil)
+        {
+            let jsonEncoder = JSONEncoder()
+
+            let progressEvent = MapBoxRouteProgressEvent(progress: progress)
+            let progressEventJsonData = try! jsonEncoder.encode(progressEvent)
+            let progressEventJson = String(data: progressEventJsonData, encoding: String.Encoding.ascii)
+
+            _eventSink!(progressEventJson)
+
+            if(progress.isFinalLeg && progress.currentLegProgress.userHasArrivedAtWaypoint)
+            {
+                _eventSink = nil
+            }
+        }
+    }
+}
 
 extension FlutterMapboxNavigationView : NavigationMapViewDelegate {
     
