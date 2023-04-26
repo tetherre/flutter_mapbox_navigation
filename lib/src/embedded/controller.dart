@@ -121,6 +121,11 @@ class MapBoxNavigationViewController {
     return success;
   }
 
+  Future<bool?> reCenterCamera() async {
+    var success = await _methodChannel.invokeMethod('reCenter', null);
+    return success;
+  }
+
   /// Generic Handler for Messages sent from the Platform
   Future<dynamic> _handleMethod(MethodCall call) async {
     switch (call.method) {
