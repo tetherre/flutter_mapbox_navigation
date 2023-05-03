@@ -14,7 +14,7 @@ public class FlutterMapboxNavigationViewFactory : NSObject, FlutterPlatformViewF
     }
 
     public func create(withFrame frame: CGRect, viewIdentifier viewId: Int64, arguments args: Any?) -> FlutterPlatformView {
-        return FlutterMapboxNavigationView(messenger: self.messenger, frame: frame, viewId: viewId, args: args)
+        return FlutterMapboxNavigationView(messenger: self.messenger, frame: frame, viewId: 0, args: args)
     }
 
     public func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {

@@ -71,7 +71,7 @@ class CustomViewportDataSource: ViewportDataSource {
     func cameraOptions(_ location: CLLocation?, routeProgress: RouteProgress? = nil) -> [String: CameraOptions] {
         followingMobileCamera.center = location?.coordinate
         // Set the bearing of the `MapView` (measured in degrees clockwise from true north).
-        followingMobileCamera.bearing = location?.course
+        followingMobileCamera.bearing = .zero
         followingMobileCamera.padding = .zero
         followingMobileCamera.zoom = 15.5
         followingMobileCamera.pitch = 45.0
@@ -103,14 +103,14 @@ extension CustomViewportDataSource: LocationConsumer {
 
     public func locationUpdate(newLocation: MapboxMaps.Location) {
         let location = CLLocation(coordinate: newLocation.coordinate,
-                                  altitude: 0.0,
+                                  altitude: newLocation.location.altitude,
                                   horizontalAccuracy: newLocation.horizontalAccuracy,
-                                  verticalAccuracy: 0.0,
+                                  verticalAccuracy: newLocation.location.verticalAccuracy,
                                   course: newLocation.course,
-                                  speed: 0.0,
+                                  speed: newLocation.location.speed,
                                   timestamp: Date())
         
-        let cameraOptions = self.cameraOptions(location)
+        let cameraOptions = self.cameraOptions(newLocation.location)
         delegate?.viewportDataSource(self, didUpdate: cameraOptions)
     }
 }
@@ -124,19 +124,19 @@ class CustomCameraStateTransition: CameraStateTransition {
     }
     
     func transitionToFollowing(_ cameraOptions: CameraOptions, completion: @escaping (() -> Void)) {
-        mapView?.camera.ease(to: cameraOptions, duration: 1, curve: .easeIn, completion: { _ in
+        mapView?.camera.ease(to: cameraOptions, duration: 0.3, curve: .easeInOut, completion: { _ in
             completion()
         })
     }
     
     func transitionToOverview(_ cameraOptions: CameraOptions, completion: @escaping (() -> Void)) {
-        mapView?.camera.ease(to: cameraOptions, duration: 0.5, curve: .easeIn, completion: { _ in
+        mapView?.camera.ease(to: cameraOptions, duration: 0.3, curve: .easeInOut, completion: { _ in
             completion()
         })
     }
     
     func update(to cameraOptions: CameraOptions, state: NavigationCameraState) {
-        mapView?.camera.ease(to: cameraOptions, duration: 1.5, curve: .linear, completion: nil)
+        mapView?.camera.ease(to: cameraOptions, duration: 0.3, curve: .easeInOut, completion: nil)
     }
     
     func cancelPendingTransition() {

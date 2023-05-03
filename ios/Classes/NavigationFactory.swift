@@ -259,11 +259,16 @@ public class NavigationFactory : NSObject, FlutterStreamHandler
             self._navigationViewController?.navigationService.endNavigation(feedback: nil)
             if(isEmbeddedNavigation)
             {
+                self._navigationViewController?.navigationService.stop()
+                self._navigationViewController?.navigationService.locationManager.stopUpdatingLocation()
+                self._navigationViewController?.navigationService.delegate = nil
                 self._navigationViewController?.navigationMapView?.mapView.removeFromSuperview()
                 self._navigationViewController?.navigationMapView?.removeFromSuperview()
                 self._navigationViewController?.view.removeFromSuperview()
                 self._navigationViewController?.removeFromParent()
+                
                 self._navigationViewController = nil
+                
                 if(result != nil)
                 {
                     result!(true)
@@ -424,7 +429,7 @@ extension NavigationFactory : NavigationViewControllerDelegate {
     }
     
     public func navigationViewController(_ navigationViewController: NavigationViewController, shouldRerouteFrom location: CLLocation) -> Bool {
-        return false
+        return !isLastWaypoint
     }
     
     public func navigationViewController(_ navigationViewController: NavigationViewController, shouldPreventReroutesWhenArrivingAt waypoint: Waypoint) -> Bool {

@@ -20,9 +20,12 @@ class MapBoxNavigationView extends StatelessWidget {
   final OnNavigationViewCreatedCallBack? onCreated;
   final ValueSetter<RouteEvent>? onRouteEvent;
 
-  MapBoxNavigationView(
-      {Key? key, this.options, this.onCreated, this.onRouteEvent})
-      : super(key: key);
+  MapBoxNavigationView({
+    Key? key,
+    this.options,
+    this.onCreated,
+    this.onRouteEvent,
+  }) : super(key: key);
   @override
   Widget build(BuildContext context) {
     if (Platform.isAndroid) {
@@ -45,6 +48,6 @@ class MapBoxNavigationView extends StatelessWidget {
     if (onCreated == null) {
       return;
     }
-    onCreated!(MapBoxNavigationViewController(id, onRouteEvent));
+    onCreated!(MapBoxNavigationViewController(0, onRouteEvent));
   }
 }

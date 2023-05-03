@@ -88,10 +88,10 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
     public func view() -> UIView
     {
-//        if(_mapInitialized)
-//        {
-//            return navigationMapView
-//        }
+        if (navigationMapView != nil)
+        {
+            return navigationMapView
+        }
         
         setupMapView()
 
@@ -134,9 +134,6 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
 
             }
 
-            let initialLatitude = arguments?["initialLatitude"] as? Double ?? currentLocation?.coordinate.latitude
-            let initialLongitude = arguments?["initialLongitude"] as? Double ?? currentLocation?.coordinate.longitude
-
         }
 
         if _longPressDestinationEnabled
@@ -167,6 +164,7 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
     func buildRoute(arguments: NSDictionary?, flutterResult: @escaping FlutterResult)
     {
         isEmbeddedNavigation = true
+        _mapInitialized = true
         sendEvent(eventType: MapBoxEventType.route_building)
 
         guard let oWayPoints = arguments?["wayPoints"] as? NSDictionary else {return}
@@ -279,6 +277,8 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
         let bottomBannerViewController = navigationOptions.bottomBanner as? BottomBannerViewController;
         bottomBannerViewController?.delegate = self
         
+        let flutterViewController = UIApplication.shared.delegate?.window?!.rootViewController as! FlutterViewController
+        
         // Remove previous navigation view and controller if any
         if(_navigationViewController?.view != nil){
             _navigationViewController!.view.removeFromSuperview()
@@ -289,21 +289,20 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
         _navigationViewController!.delegate = self
         _navigationViewController!.showsEndOfRouteFeedback = false;
 
-        let flutterViewController = UIApplication.shared.delegate?.window?!.rootViewController as! FlutterViewController
-        
         flutterViewController.addChild(_navigationViewController!)
         self.navigationMapView.addSubview(_navigationViewController!.view)
         
         _navigationViewController!.view.translatesAutoresizingMaskIntoConstraints = false
         
         if let mapView = self._navigationViewController?.navigationMapView?.mapView {
-            let customViewportDataSource = CustomViewportDataSource(mapView)
+            let customViewportDataSource = NavigationViewportDataSource(mapView, viewportDataSourceType: ViewportDataSourceType.active)
+            //customViewportDataSource.shouldTrackLocation = true
             self._navigationViewController?.navigationMapView?.navigationCamera.viewportDataSource = customViewportDataSource
-            let customCameraStateTransition = CustomCameraStateTransition(mapView)
-            self._navigationViewController?.navigationMapView?.navigationCamera.cameraStateTransition = customCameraStateTransition
+            //let customCameraStateTransition = CustomCameraStateTransition(mapView)
+            self._navigationViewController?.navigationMapView?.navigationCamera.cameraStateTransition = NavigationCameraStateTransition(mapView)
         }
         
-        self._navigationViewController?.navigationMapView?.navigationCamera.follow()
+        //self._navigationViewController?.navigationMapView?.navigationCamera.follow()
         
         constraintsWithPaddingBetween(holderView: self.navigationMapView, topView: _navigationViewController!.view, padding: 0.0)
         flutterViewController.didMove(toParent: flutterViewController)
