@@ -85,6 +85,45 @@ class MapBoxNavigationViewController {
     });
   }
 
+  ///Update route of Navigation
+  ///
+  /// [wayPoints] must not be null. A collection of [WayPoint](longitude, latitude and name). Must be at least 2 or at most 25. Cannot use drivingWithTraffic mode if more than 3-waypoints.
+  /// [options] options used to generate the route and used while navigating
+  ///
+  Future<bool> updateNavigation({
+    required List<WayPoint> wayPoints,
+  }) async {
+    assert(wayPoints.length > 0);
+    List<Map<String, Object?>> pointList = [];
+
+    for (int i = 0; i < wayPoints.length; i++) {
+      var wayPoint = wayPoints[i];
+      assert(wayPoint.name != null);
+      assert(wayPoint.latitude != null);
+      assert(wayPoint.longitude != null);
+
+      final pointMap = <String, dynamic>{
+        "Order": i,
+        "Name": wayPoint.name,
+        "Latitude": wayPoint.latitude,
+        "Longitude": wayPoint.longitude,
+      };
+      pointList.add(pointMap);
+    }
+    var i = 0;
+    var wayPointMap =
+        Map.fromIterable(pointList, key: (e) => i++, value: (e) => e);
+
+    Map<String, dynamic> args = Map<String, dynamic>();
+    args["wayPoints"] = wayPointMap;
+    return await _methodChannel
+        .invokeMethod('updateNavigation', args)
+        .then<bool>((dynamic result) {
+      print("MAPBOX PACKAGE - UPDATE ROUTE NAVIGATION: $result");
+      return result;
+    });
+  }
+
   /// starts listening for events
   Future<void> initialize() async {
     //_routeEventSubscription = _streamRouteEvent!.listen(_onProgressData);

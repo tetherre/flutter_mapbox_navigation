@@ -73,6 +73,10 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
             {
                 strongSelf.startEmbeddedNavigation(arguments: arguments, result: result)
             }
+            else if(call.method == "updateNavigation")
+            {
+                strongSelf.updateNavigation(arguments: arguments, flutterResult: result)
+            }
             else if(call.method == "reCenter"){
                 //used to recenter map from user action during navigation
                 
@@ -307,6 +311,82 @@ public class FlutterMapboxNavigationView : NavigationFactory, FlutterPlatformVie
         constraintsWithPaddingBetween(holderView: self.navigationMapView, topView: _navigationViewController!.view, padding: 0.0)
         flutterViewController.didMove(toParent: flutterViewController)
         result(true)
+    }
+    
+    func updateNavigation(arguments: NSDictionary?, flutterResult: @escaping FlutterResult) {
+        guard let response = self.routeResponse else { flutterResult(false); return }
+        
+        guard let oWayPoints = arguments?["wayPoints"] as? NSDictionary else {return}
+        guard var locations = getLocationsFromWayPointDictionary(waypoints: oWayPoints) else { return }
+        if(!_isOptimized)
+        {
+           //waypoints must be in the right order
+           locations.sort(by: {$0.order ?? 0 < $1.order ?? 0})
+        }
+
+        if (_wayPoints.count > 1) {
+           _wayPoints.removeLast()
+        }
+
+        var nextIndex = 1
+        for loc in locations
+        {
+           let wayPoint = Waypoint(coordinate: CLLocationCoordinate2D(latitude: loc.latitude!, longitude: loc.longitude!), name: loc.name)
+           if (_wayPoints.count >= nextIndex) {
+               _wayPoints.insert(wayPoint, at: nextIndex)
+           }
+           else {
+               _wayPoints.append(wayPoint)
+           }
+           nextIndex += 1
+        }
+        
+        var mode: ProfileIdentifier = .automobileAvoidingTraffic
+
+        if (_navigationMode == "cycling")
+        {
+            mode = .cycling
+        }
+        else if(_navigationMode == "driving")
+        {
+            mode = .automobile
+        }
+        else if(_navigationMode == "walking")
+        {
+            mode = .walking
+        }
+        
+        let routeOptions = NavigationRouteOptions(waypoints: _wayPoints, profileIdentifier: mode)
+
+        if (_allowsUTurnAtWayPoints != nil)
+        {
+            routeOptions.allowsUTurnAtWaypoint = _allowsUTurnAtWayPoints!
+        }
+
+        routeOptions.distanceMeasurementSystem = _voiceUnits == "imperial" ? .imperial : .metric
+        routeOptions.locale = Locale(identifier: _language)
+        self.routeOptions = routeOptions
+
+        // Generate the route object and draw it on the map
+        _ = Directions.shared.calculate(routeOptions) { [weak self] (session, result) in
+
+            guard case let .success(response) = result, let strongSelf = self else {
+                flutterResult(false)
+                self?.sendEvent(eventType: MapBoxEventType.route_build_failed)
+                return
+            }
+            strongSelf.routeResponse = response
+            strongSelf.navigationMapView?.showcase(response.routes!, routesPresentationStyle: .all(shouldFit: true), animated: true)
+        }
+        
+        _navigationViewController?.navigationService.router.updateRoute(with: IndexedRouteResponse(routeResponse: response, routeIndex: selectedRouteIndex), routeOptions: self.routeOptions)
+        { success in
+            if (success) {
+                flutterResult(true)
+            } else {
+                flutterResult(false)
+            }
+        }
     }
     
     func constraintsWithPaddingBetween(holderView: UIView, topView: UIView, padding: CGFloat) {

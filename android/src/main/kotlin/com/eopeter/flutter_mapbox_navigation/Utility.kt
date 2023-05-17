@@ -18,6 +18,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.doOnAttach
 import androidx.lifecycle.*
+import com.eopeter.flutter_mapbox_navigation.activity.WaypointsSet
 import eopeter.flutter_mapbox_navigation.databinding.NavigationActivityBinding
 import eopeter.flutter_mapbox_navigation.R
 import com.eopeter.flutter_mapbox_navigation.models.MapBoxEvents
@@ -89,6 +90,7 @@ import com.mapbox.navigation.ui.voice.model.SpeechVolume
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import timber.log.Timber
 import java.util.*
 
 open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBinding, accessToken: String):  MethodChannel.MethodCallHandler, EventChannel.StreamHandler,
@@ -275,8 +277,14 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
             "startNavigation" -> {
                 startNavigation(methodCall, result)
             }
+            "updateNavigation" -> {
+                updateNavigation(methodCall, result)
+            }
             "finishNavigation" -> {
                 finishNavigation(methodCall, result)
+            }
+            "reCenter" -> {
+                navigationCamera.requestNavigationCameraToFollowing()
             }
             "getDistanceRemaining" -> {
                 result.success(distanceRemaining)
@@ -431,6 +439,93 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         }
     }
 
+    private fun updateNavigation(methodCall: MethodCall, result: MethodChannel.Result) {
+
+        val arguments = methodCall.arguments as? Map<*, *>
+
+        val points = arguments?.get("wayPoints") as HashMap<Int, Any>
+        var stop : Point? = null;
+        for (item in points)
+        {
+            val point = item.value as HashMap<*, *>
+            val latitude = point["Latitude"] as Double
+            val longitude = point["Longitude"] as Double
+            stop = Point.fromLngLat(longitude, latitude)
+        }
+
+        if (stop != null) {
+            if (!addedWaypoints.isEmpty) {
+                addedWaypoints.removeLast()
+            }
+            addWaypoint(stop, null)
+        }
+
+        if (currentRoute != null) {
+            result.success(true)
+        } else {
+            result.success(false)
+        }
+    }
+
+    //MultiWaypoint Navigation
+    private fun addWaypoint(destination: Point, name: String?) {
+        val originLocation = navigationLocationProvider.lastLocation
+        val originPoint = originLocation?.let {
+            Point.fromLngLat(it.longitude, it.latitude)
+        } ?: return
+
+        // we always start a route from the current location
+        if (addedWaypoints.isEmpty) {
+            addedWaypoints.addRegular(originPoint)
+        }
+
+        if (name != null) {
+            // When you add named waypoints, the string you use here inside "" would be shown in `Maneuver` and played in `Voice` instructions.
+            // In this example waypoint names will be visible in the logcat.
+            addedWaypoints.addNamed(destination, name)
+        } else {
+            // When you add silent waypoints, make sure it is followed by a regular or named waypoint, otherwise silent waypoint is treated as a regular waypoint
+            addedWaypoints.addSilent(destination)
+        }
+
+        // execute a route request
+        // it's recommended to use the
+        // applyDefaultNavigationOptions and applyLanguageAndVoiceUnitOptions
+        // that make sure the route request is optimized
+        // to allow for support of all of the Navigation SDK features
+        mapboxNavigation.requestRoutes(
+            RouteOptions.builder()
+                .applyDefaultNavigationOptions(navigationMode)
+                .applyLanguageAndVoiceUnitOptions(context)
+                .coordinatesList(addedWaypoints.coordinatesList())
+                .waypointIndicesList(addedWaypoints.waypointsIndices())
+                .waypointNamesList(addedWaypoints.waypointsNames())
+                .build(),
+            object : NavigationRouterCallback {
+                override fun onCanceled(routeOptions: RouteOptions, routerOrigin: RouterOrigin) {
+                    // no impl
+                }
+
+                override fun onFailure(reasons: List<RouterFailure>, routeOptions: RouteOptions) {
+                    // no impl
+                }
+
+                override fun onRoutesReady(
+                    routes: List<NavigationRoute>,
+                    routerOrigin: RouterOrigin
+                ) {
+                    setRoute(routes)
+                }
+            }
+        )
+    }
+
+    private fun setRoute(routes: List<NavigationRoute>) {
+        // set routes, where the first route in the list is the primary route that
+        // will be used for active guidance
+        mapboxNavigation.setNavigationRoutes(routes)
+    }
+
     private fun finishNavigation(methodCall: MethodCall, result: MethodChannel.Result) {
 
         finishNavigation()
@@ -450,14 +545,14 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
             if (simulateRoute) {
                 mapboxReplayer.play()
             }
+
             mapboxNavigation.startTripSession()
             // show UI elements
             binding.soundButton.visibility = View.VISIBLE
             binding.routeOverview.visibility = View.VISIBLE
             binding.tripProgressCard.visibility = View.VISIBLE
 
-            // move the camera to overview when new route is available
-            navigationCamera.requestNavigationCameraToOverview()
+            navigationCamera.requestNavigationCameraToFollowing()
             isNavigationInProgress = true
             PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_RUNNING)
         }
@@ -488,6 +583,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         binding.maneuverView.visibility = View.INVISIBLE
         binding.routeOverview.visibility = View.INVISIBLE
         binding.tripProgressCard.visibility = View.INVISIBLE
+        addedWaypoints.clear()
         PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
     }
 
@@ -602,6 +698,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
     }
 
     fun onDestroy() {
+        Log.d("UTILITY", "OnDestroyLog")
         mapboxReplayer.finish()
         maneuverApi.cancel()
         routeLineApi.cancel()
@@ -714,6 +811,8 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
                 mapboxNavigation.unregisterRouteProgressObserver(routeProgressObserver)
                 mapboxNavigation.unregisterRouteProgressObserver(replayProgressObserver)
                 mapboxNavigation.unregisterVoiceInstructionsObserver(voiceInstructionsObserver)
+
+                Log.d("UTILITY", "OnDetached")
             }
         },
         //onInitialize = this::initNavigation
@@ -767,6 +866,11 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
             40.0 * pixelDensity
         )
     }
+
+    /**
+     * Helper class that keeps added waypoints and transforms them to the [RouteOptions] params.
+     */
+    private val addedWaypoints = WaypointsSet()
 
     /**
      * Generates updates for the [MapboxManeuverView] to display the upcoming maneuver instructions
@@ -902,7 +1006,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
             // it's best to immediately move the camera to the current user location
             if (!firstLocationUpdateReceived) {
                 firstLocationUpdateReceived = true
-                navigationCamera.requestNavigationCameraToOverview(
+                navigationCamera.requestNavigationCameraToFollowing(
                     stateTransitionOptions = NavigationCameraTransitionOptions.Builder()
                         .maxDuration(0) // instant transition
                         .build()
@@ -1030,6 +1134,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
 
     override fun onActivityStopped(activity: Activity) {
         TODO("Not yet implemented")
+        Log.d("UTILITY", "onActivityStopped")
     }
 
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {
@@ -1038,6 +1143,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
 
     override fun onActivityDestroyed(activity: Activity) {
         TODO("Not yet implemented")
+        Log.d("UTILITY", "onActivityDestroyed")
     }
 
     override fun getLifecycle(): Lifecycle {
