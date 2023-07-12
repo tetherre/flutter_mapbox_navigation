@@ -151,7 +151,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         binding.mapView.camera.addCameraAnimationsLifecycleListener(
             NavigationBasicGesturesHandler(navigationCamera)
         )
-        navigationCamera.registerNavigationCameraStateChangeObserver { navigationCameraState ->
+        /*navigationCamera.registerNavigationCameraStateChangeObserver { navigationCameraState ->
             // shows/hide the recenter button depending on the camera state
             when (navigationCameraState) {
                 NavigationCameraState.TRANSITION_TO_FOLLOWING,
@@ -160,7 +160,7 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
                 NavigationCameraState.OVERVIEW,
                 NavigationCameraState.IDLE -> binding.recenter.visibility = View.VISIBLE
             }
-        }
+        }*/
         // set the padding values depending on screen orientation and visible view layout
         if (activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             viewportDataSource.overviewPadding = landscapeOverviewPadding
@@ -236,28 +236,28 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         }
 
         // initialize view interactions
-        binding.stop.bringToFront()
-        binding.stop.isFocusable = true
-        binding.stop.setOnClickListener {
+        //binding.stop.bringToFront()
+        //binding.stop.isFocusable = true
+        //binding.stop.setOnClickListener {
             ////clearRouteAndStopNavigation()
-            finishNavigation()
-        }
+            //finishNavigation()
+        //}
 
-        binding.recenter.setOnClickListener {
-            navigationCamera.requestNavigationCameraToFollowing()
-            binding.routeOverview.showTextAndExtend(BUTTON_ANIMATION_DURATION)
-        }
-        binding.routeOverview.setOnClickListener {
-            navigationCamera.requestNavigationCameraToOverview()
-            binding.recenter.showTextAndExtend(BUTTON_ANIMATION_DURATION)
-        }
-        binding.soundButton.setOnClickListener {
-            // mute/unmute voice instructions
-            isVoiceInstructionsMuted = !isVoiceInstructionsMuted
-        }
-
-        // set initial sounds button state
-        binding.soundButton.unmute()
+//        binding.recenter.setOnClickListener {
+//            navigationCamera.requestNavigationCameraToFollowing()
+//            binding.routeOverview.showTextAndExtend(BUTTON_ANIMATION_DURATION)
+//        }
+//        binding.routeOverview.setOnClickListener {
+//            navigationCamera.requestNavigationCameraToOverview()
+//            binding.recenter.showTextAndExtend(BUTTON_ANIMATION_DURATION)
+//        }
+//        binding.soundButton.setOnClickListener {
+//            // mute/unmute voice instructions
+//            isVoiceInstructionsMuted = !isVoiceInstructionsMuted
+//        }
+//
+//        // set initial sounds button state
+//        binding.soundButton.unmute()
     }
 
     override fun onMethodCall(methodCall: MethodCall, result: MethodChannel.Result) {
@@ -285,6 +285,9 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
             }
             "reCenter" -> {
                 navigationCamera.requestNavigationCameraToFollowing()
+            }
+            "toOverview" -> {
+                navigationCamera.requestNavigationCameraToOverview()
             }
             "getDistanceRemaining" -> {
                 result.success(distanceRemaining)
@@ -416,10 +419,10 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         mapboxReplayer.stop()
 
         // hide UI elements
-        binding.soundButton.visibility = View.INVISIBLE
+        //binding.soundButton.visibility = View.INVISIBLE
         binding.maneuverView.visibility = View.INVISIBLE
-        binding.routeOverview.visibility = View.INVISIBLE
-        binding.tripProgressCard.visibility = View.INVISIBLE
+        //binding.routeOverview.visibility = View.INVISIBLE
+        //binding.tripProgressCard.visibility = View.INVISIBLE
 
         PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
     }
@@ -548,9 +551,9 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
 
             mapboxNavigation.startTripSession()
             // show UI elements
-            binding.soundButton.visibility = View.VISIBLE
-            binding.routeOverview.visibility = View.VISIBLE
-            binding.tripProgressCard.visibility = View.VISIBLE
+            //binding.soundButton.visibility = View.VISIBLE
+            //binding.routeOverview.visibility = View.VISIBLE
+            //binding.tripProgressCard.visibility = View.VISIBLE
 
             navigationCamera.requestNavigationCameraToFollowing()
             isNavigationInProgress = true
@@ -579,10 +582,10 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         mapboxNavigation.stopTripSession()
 
         // hide UI elements
-        binding.soundButton.visibility = View.INVISIBLE
+        //binding.soundButton.visibility = View.INVISIBLE
         binding.maneuverView.visibility = View.INVISIBLE
-        binding.routeOverview.visibility = View.INVISIBLE
-        binding.tripProgressCard.visibility = View.INVISIBLE
+        //binding.routeOverview.visibility = View.INVISIBLE
+        //binding.tripProgressCard.visibility = View.INVISIBLE
         addedWaypoints.clear()
         PluginUtilities.sendEvent(MapBoxEvents.NAVIGATION_CANCELLED)
     }
@@ -910,10 +913,10 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         set(value) {
             field = value
             if (value) {
-                binding.soundButton.muteAndExtend(BUTTON_ANIMATION_DURATION)
+                //binding.soundButton.muteAndExtend(BUTTON_ANIMATION_DURATION)
                 voiceInstructionsPlayer.volume(SpeechVolume(0f))
             } else {
-                binding.soundButton.unmuteAndExtend(BUTTON_ANIMATION_DURATION)
+                //binding.soundButton.unmuteAndExtend(BUTTON_ANIMATION_DURATION)
                 voiceInstructionsPlayer.volume(SpeechVolume(1f))
             }
         }
@@ -1047,9 +1050,9 @@ open class TurnByTurn(ctx: Context, act: Activity, bind: NavigationActivityBindi
         )
 
         // update bottom trip progress summary
-        binding.tripProgressView.render(
-            tripProgressApi.getTripProgress(routeProgress)
-        )
+        //binding.tripProgressView.render(
+        //    tripProgressApi.getTripProgress(routeProgress)
+        //)
 
         //update flutter events
         if (!isNavigationCanceled) {

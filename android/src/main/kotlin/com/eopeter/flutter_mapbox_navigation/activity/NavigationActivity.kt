@@ -149,7 +149,7 @@ class NavigationActivity : AppCompatActivity() {
         binding.mapView.camera.addCameraAnimationsLifecycleListener(
                 NavigationBasicGesturesHandler(navigationCamera)
         )
-        navigationCamera.registerNavigationCameraStateChangeObserver { navigationCameraState ->
+        /*navigationCamera.registerNavigationCameraStateChangeObserver { navigationCameraState ->
             // shows/hide the recenter button depending on the camera state
             when (navigationCameraState) {
                 NavigationCameraState.TRANSITION_TO_FOLLOWING,
@@ -158,7 +158,7 @@ class NavigationActivity : AppCompatActivity() {
                 NavigationCameraState.OVERVIEW,
                 NavigationCameraState.IDLE -> binding.recenter.visibility = View.VISIBLE
             }
-        }
+        }*/
         // set the padding values depending on screen orientation and visible view layout
         if (this.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
             viewportDataSource.overviewPadding = landscapeOverviewPadding
@@ -239,24 +239,24 @@ class NavigationActivity : AppCompatActivity() {
         }
 
         // initialize view interactions
-        binding.stop.setOnClickListener {
-            clearRouteAndStopNavigation()
-        }
-        binding.recenter.setOnClickListener {
-            navigationCamera.requestNavigationCameraToFollowing()
-            binding.routeOverview.showTextAndExtend(BUTTON_ANIMATION_DURATION)
-        }
-        binding.routeOverview.setOnClickListener {
-            navigationCamera.requestNavigationCameraToOverview()
-            binding.recenter.showTextAndExtend(BUTTON_ANIMATION_DURATION)
-        }
-        binding.soundButton.setOnClickListener {
-            // mute/unmute voice instructions
-            isVoiceInstructionsMuted = !isVoiceInstructionsMuted
-        }
-
-        // set initial sounds button state
-        binding.soundButton.unmute()
+//        binding.stop.setOnClickListener {
+//            clearRouteAndStopNavigation()
+//        }
+//        binding.recenter.setOnClickListener {
+//            navigationCamera.requestNavigationCameraToFollowing()
+//            binding.routeOverview.showTextAndExtend(BUTTON_ANIMATION_DURATION)
+//        }
+//        binding.routeOverview.setOnClickListener {
+//            navigationCamera.requestNavigationCameraToOverview()
+//            binding.recenter.showTextAndExtend(BUTTON_ANIMATION_DURATION)
+//        }
+//        binding.soundButton.setOnClickListener {
+//            // mute/unmute voice instructions
+//            isVoiceInstructionsMuted = !isVoiceInstructionsMuted
+//        }
+//
+//        // set initial sounds button state
+//        binding.soundButton.unmute()
 
         // start the trip session to being receiving location updates in free drive
         // and later when a route is set also receiving route progress updates
@@ -506,9 +506,9 @@ class NavigationActivity : AppCompatActivity() {
         startSimulation(routes.first())
 
         // show UI elements
-        binding.soundButton.visibility = View.VISIBLE
-        binding.routeOverview.visibility = View.VISIBLE
-        binding.tripProgressCard.visibility = View.VISIBLE
+//        binding.soundButton.visibility = View.VISIBLE
+//        binding.routeOverview.visibility = View.VISIBLE
+//        binding.tripProgressCard.visibility = View.VISIBLE
 
         // move the camera to overview when new route is available
         navigationCamera.requestNavigationCameraToFollowing()
@@ -522,10 +522,10 @@ class NavigationActivity : AppCompatActivity() {
         mapboxReplayer.stop()
 
         // hide UI elements
-        binding.soundButton.visibility = View.INVISIBLE
+        //binding.soundButton.visibility = View.INVISIBLE
         binding.maneuverView.visibility = View.INVISIBLE
-        binding.routeOverview.visibility = View.INVISIBLE
-        binding.tripProgressCard.visibility = View.INVISIBLE
+        //binding.routeOverview.visibility = View.INVISIBLE
+        //binding.tripProgressCard.visibility = View.INVISIBLE
 
         finish();
     }
@@ -691,10 +691,10 @@ class NavigationActivity : AppCompatActivity() {
         set(value) {
             field = value
             if (value) {
-                binding.soundButton.muteAndExtend(BUTTON_ANIMATION_DURATION)
+                //binding.soundButton.muteAndExtend(BUTTON_ANIMATION_DURATION)
                 voiceInstructionsPlayer.volume(SpeechVolume(0f))
             } else {
-                binding.soundButton.unmuteAndExtend(BUTTON_ANIMATION_DURATION)
+                //binding.soundButton.unmuteAndExtend(BUTTON_ANIMATION_DURATION)
                 voiceInstructionsPlayer.volume(SpeechVolume(1f))
             }
         }
@@ -830,9 +830,9 @@ class NavigationActivity : AppCompatActivity() {
         sendEvent(progressEvent)
 
         // update bottom trip progress summary
-        binding.tripProgressView.render(
+       /* binding.tripProgressView.render(
                 tripProgressApi.getTripProgress(routeProgress)
-        )
+        )*/
     }
 
     /**

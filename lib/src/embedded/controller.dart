@@ -165,6 +165,11 @@ class MapBoxNavigationViewController {
     return success;
   }
 
+  Future<bool?> moveToOverview() async {
+    var success = await _methodChannel.invokeMethod('toOverview', null);
+    return success;
+  }
+
   /// Generic Handler for Messages sent from the Platform
   Future<dynamic> _handleMethod(MethodCall call) async {
     switch (call.method) {
@@ -180,7 +185,7 @@ class MapBoxNavigationViewController {
     if (event.eventType == MapBoxEvent.navigation_finished)
       _routeEventSubscription.cancel();
 
-    print("ONPROGRESS DATA ${event.eventType}");
+    print("ONPROGRESS DATA ${event.data}");
   }
 
   Stream<RouteEvent>? get _streamRouteEvent {
@@ -201,7 +206,7 @@ class MapBoxNavigationViewController {
           eventType: MapBoxEvent.progress_change, data: progressEvent);
     } else
       event = RouteEvent.fromJson(map);
-    print("MAPBOX EVENT: ${event.eventType}");
+    //print("MAPBOX EVENT: ${event.data}");
     return event;
   }
 }
